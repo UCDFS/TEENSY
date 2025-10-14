@@ -14,7 +14,6 @@
  */
 
 #include "core_pins.h"
-#include "header.h"
 #include "usb_serial.h"
 #include "wiring.h"
 
