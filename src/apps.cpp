@@ -3,12 +3,11 @@
  * @brief Handles reading and validating Accelerator Pedal Position Sensors
  * (APPS)
  * @author Shane Whelan (UCD Formula Student)
- * @date 2025-07-17
+ * @author Asher Olgeirson (UCD Formula Student)
+ * @date 2025/2026
  */
 
 #include "apps.h"
-#include "header.h"
-#include "variant.h"
 #include <cmath>  // For std::fabs
 #include <limits> // For std::numeric_limits
 using namespace APPS;
@@ -19,6 +18,8 @@ using namespace APPS;
  * @return Pedal position (0.0 to 100.0) if sensors are plausible, -1.0 if
  * implausible
  */
+// TODO: If Apps>= 25 && Brake pedal is pressed for over 500ms, torque needs to
+// be 0nm. Logic should be handled in main.cpp for this.
 double APPS::get_apps_reading() {
   int apps_1_raw = analogRead(APPS_1_PIN);
   int apps_2_raw = analogRead(APPS_2_PIN);
@@ -75,7 +76,7 @@ double APPS::get_apps_reading() {
   // Return the average percentage if plausible
   double average_percent = (apps_1_percent + apps_2_percent) / 2.0;
 
-  if (DEBUG_MODE >= 6) {
+  if (DEBUG_MODE >= 2) {
     static unsigned long last_apps_print = 0;
     if (millis() - last_apps_print > 1000) {
       Serial.print("APPS Readings - Raw: ");
