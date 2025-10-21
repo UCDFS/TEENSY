@@ -1,10 +1,11 @@
 # TEENSY VCU System
 
-This repository contains the Vehicle Control Unit (VCU) software for the UC Davis Formula SAE team, designed to run on the Teensy 4.1 microcontroller.
+This repository contains the Vehicle Control Unit (VCU) software for the University College Dublin Formula SAE team, designed to run on the Teensy 4.1 microcontroller.
 
 ## Overview
 
 This is the new repository for our VCU system. We are migrating to the Teensy 4.1 platform for improved performance and capabilities. The Teensy 4.1 provides:
+
 - 600 MHz ARM Cortex-M7 processor
 - 8 MB Flash memory
 - 1 MB RAM
@@ -63,6 +64,7 @@ TEENSY/
 ### Serial Monitor
 
 To view serial output from the Teensy:
+
 - Click the plug icon in the PlatformIO toolbar
 - Use the command palette: `PlatformIO: Serial Monitor`
 - Run in terminal: `pio device monitor`
