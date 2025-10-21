@@ -1,6 +1,6 @@
 # TEENSY VCU System
 
-This repository contains the Vehicle Control Unit (VCU) software for the UC Davis Formula SAE team, designed to run on the Teensy 4.1 microcontroller.
+This repository contains the Vehicle Control Unit (VCU) software for the University College Dublin Formula SAE team, designed to run on the Teensy 4.1 microcontroller.
 
 ## Overview
 
@@ -116,7 +116,7 @@ This repository replaces the previous VCU system. See `vcu_software.ino` in the 
 
 ## License
 
-Copyright UC Davis Formula SAE Team
+Copyright University College Dublin Formula SAE Team
 
 ## Support
 
