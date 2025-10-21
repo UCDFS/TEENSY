@@ -11,18 +11,26 @@ void setup() {
   Serial.println("\n--- UCD FS EV Controller Starting ---");
 
   // Check if APPS is non-zero on startup as that might indicate somthing wrong
-  if (APPS::get_apps_reading() < 0 || APPS::get_apps_reading() > 5) {
+  if (APPS::get_apps_reading().value < 0 ||
+      APPS::get_apps_reading().value > 5) {
     Serial.println("WARNING: APPS non-zero on init");
+  }
+  if (APPS::get_apps_reading().status == APPS::AppsStatus::Fault) {
+    Serial.println("ERROR: APPS fault on init");
+  }
+
+  if (APPS::get_apps_reading().status == APPS::AppsStatus::Implausible) {
+    Serial.println("ERROR: APPS implausiblity on init");
   }
 }
 
 void loop() {
 
   // Read pedal position
-  double pedal_position = APPS::get_apps_reading();
+  APPS::AppsReading apps_result = APPS::get_apps_reading();
 
   // pedal_position will be -1.0 during implausiblity or fault
-  if (pedal_position < 0.0) {
+  if (apps_result.status != APPS::AppsStatus::OK) {
     if (APPS::implausibility_start == 0) {
       APPS::implausibility_start = millis();
     }

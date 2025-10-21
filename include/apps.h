@@ -16,11 +16,29 @@
 #include "core_pins.h"
 #include "usb_serial.h"
 #include "wiring.h"
+#include <utility>
 
 namespace APPS {
 
-double
-get_apps_reading(); // Returns pedal position (%) or -1.0 on implausibility
+enum class AppsStatus { OK, Implausible, Fault };
+
+struct AppsReading {
+  AppsReading(AppsStatus status, double value) {
+    this->status = status;
+    this->value = value;
+  }
+
+  AppsStatus status;
+  double value; // This could work as an std::optional<double>, but the risk of
+                // bad optional access exceptions outweighs the advantage
+};
+
+// Returns pedal position (%) or -1.0 on implausibility
+AppsReading get_apps_reading();
+bool check_plausiblity(std::pair<float, float> percentages);
+bool check_integrity(std::pair<float, float> raws);
+std::pair<float, float> get_raw_values();
+std::pair<float, float> get_percentage_values(std::pair<float, float> raws);
 
 constexpr int DEBUG_MODE = 0; // 0: Off, 1: implausibility only, 2: all
 
