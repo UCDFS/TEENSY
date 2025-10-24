@@ -86,8 +86,6 @@ bool APPS::check_integrity(std::pair<float, float> raws) {
 /**
  * @brief Reads APPS sensors, checks for plausibility, and returns average pedal
  * position
- * @return Pedal position (0.0 to 100.0) if sensors are plausible, -1.0 if
- * implausible
  */
 // TODO: If Apps>= 25 && Brake pedal is pressed for over 500ms, torque needs to
 // be 0nm. Logic should be handled in main.cpp for this.

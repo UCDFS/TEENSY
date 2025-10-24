@@ -1,5 +1,13 @@
 #ifndef APPS_H
 #define APPS_H
+/**
+ * @file apps.h
+ * @brief Accelerator Pedal Position Sensor; Determines motor output and
+ * accelerator output plausibility
+ * @author Asher Olgeirson (UCD Formula Student)
+ * @author Shane Whelan (UCD Formula Student)
+ * @date 2025-2026
+ * */
 
 /* Accelerator Pedal Position Sensor                            \
   See T.11.8 and T.11.9 for more info                                          \
@@ -33,11 +41,22 @@ struct AppsReading {
                 // bad optional access exceptions outweighs the advantage
 };
 
-// Returns pedal position (%) or -1.0 on implausibility
+//@breif Returns pedal position (%) or -1.0 on implausibility
+//@return An AppsReading struct containing validity and pedal position
+// Do not trust .value without first checking that .status is OK
 AppsReading get_apps_reading();
+
+//@breif T.11.8 compliance. Accepts a pair of APPS1 and APPS2 in order
 bool check_plausiblity(std::pair<float, float> percentages);
+
+//@breif T.11.9 compliance. Accepts a pair of APPS1 and APPS2 in order
 bool check_integrity(std::pair<float, float> raws);
+
+//@breif reads raw values without adjusting or normalizing
 std::pair<float, float> get_raw_values();
+
+//@breif converts raw values to percentages. First position in input pair
+//becomes first position in return pair and vice versa
 std::pair<float, float> get_percentage_values(std::pair<float, float> raws);
 
 constexpr int DEBUG_MODE = 0; // 0: Off, 1: implausibility only, 2: all
