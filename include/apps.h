@@ -59,7 +59,7 @@ std::pair<float, float> get_raw_values();
 //becomes first position in return pair and vice versa
 std::pair<float, float> get_percentage_values(std::pair<float, float> raws);
 
-constexpr int DEBUG_MODE = 0; // 0: Off, 1: implausibility only, 2: all
+constexpr int DEBUG_MODE = 2; // 0: Off, 1: implausibility only, 2: all
 
 // TODO: Get real measurements
 extern const double PEDAL_MIN;
@@ -75,10 +75,10 @@ inline int implausibility_start = 0;
 // Define pedal calibration constants
 // These are RAW ADC values (not voltages), since values DECREASE when
 // pressed
-constexpr int APPS1_RAW_MIN = 477; // Value when pedal is fully pressed (100%)
-constexpr int APPS1_RAW_MAX = 702; // Value when pedal is released (0%)
-constexpr int APPS2_RAW_MIN = 478; // Value when pedal is fully pressed (100%)
-constexpr int APPS2_RAW_MAX = 701; // Value when pedal is released (0%)
+constexpr int APPS1_RAW_MIN = 473; // Value when pedal is fully pressed (100%)
+constexpr int APPS1_RAW_MAX = 750; // Value when pedal is released (0%)
+constexpr int APPS2_RAW_MIN = 468; // Value when pedal is fully pressed (100%)
+constexpr int APPS2_RAW_MAX = 750; // Value when pedal is released (0%)
 
 // APPS
 constexpr float APPS_PLAUSIBILITY_THRESHOLD = 10.0f; // T11.8.9

@@ -36,6 +36,7 @@ void loop() {
     }
     if (millis() - APPS::implausibility_start >=
         APPS::PLAUSIBILITY_TIMEOUT_MS) {
+          Serial.println("APPS Implausibility Timeout Reached");
       // TODO: Disable Torque
     }
   } else {
