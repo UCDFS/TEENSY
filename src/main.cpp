@@ -3,6 +3,8 @@
 #include "elapsedMillis.h"
 #include "header.h"
 #include "usb_serial.h"
+#include <Arduino.h>
+#include "brake_light.h"
 
 void setup() {
   Serial.begin(115200);
