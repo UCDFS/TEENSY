@@ -114,11 +114,13 @@ APPS::AppsReading APPS::get_apps_reading() {
   }
 
   if (!integrity) {
-    return AppsReading(AppsStatus::Fault, 0.0);
+    return AppsReading(AppsStatus::Fault, 0.0, percentages.first,
+                       percentages.second);
   } else if (!plausibility) {
-    return AppsReading(AppsStatus::Implausible, 0.0);
+    return AppsReading(AppsStatus::Implausible, 0.0, percentages.first,
+                       percentages.second);
   } else {
-
-    return AppsReading(AppsStatus::OK, average_percent);
+    return AppsReading(AppsStatus::OK, average_percent, percentages.first,
+                       percentages.second);
   }
 }

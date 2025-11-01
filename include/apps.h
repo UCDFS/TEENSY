@@ -31,14 +31,18 @@ namespace APPS {
 enum class AppsStatus { OK, Implausible, Fault };
 
 struct AppsReading {
-  AppsReading(AppsStatus status, double value) {
+  AppsReading(AppsStatus status, double value, double APPS1, double APPS2) {
     this->status = status;
     this->value = value;
+    this->APPS1 = APPS1;
+    this->APPS2 = APPS2;
   }
 
   AppsStatus status;
   double value; // This could work as an std::optional<double>, but the risk of
                 // bad optional access exceptions outweighs the advantage
+  double APPS1;
+  double APPS2;
 };
 
 //@breif Returns pedal position (%) or -1.0 on implausibility

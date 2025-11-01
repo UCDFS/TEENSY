@@ -5,33 +5,29 @@
  * @author Shane Whelan (UCD Formula Student)
  * @date 2025-04-27
  */
+/**
+ * @file header.h
+ * @brief Global configuration for the Formula Student testing setup
+ */
 
-// TODO: calibration below
-//   consider using deceleration directly from MPU if required by rules
-//   (T6.3.1).
-// - Define pins and logic for monitoring critical errors (IMD, BSPD etc.) via
-// digital inputs.
+#pragma once
+#include <Arduino.h>
 
-#ifndef HEADER_H
-#define HEADER_H
+// ====== GLOBAL FLAGS ======
+constexpr bool DEBUG_MODE = true;          // Enable Serial debug output
+constexpr bool BENCH_TESTING_MODE = true;  // Prevents unsafe vehicle actions
 
-// ------------ STANDARD LIBRARIES ------------
-#include <cmath>
-#include <stdint.h> // For fixed-width integer types
+// ====== PIN ASSIGNMENTS ======
+constexpr int RTD_BUTTON_PIN  = 22;  // Momentary Ready-to-Drive button
+constexpr int BUZZER_PIN      = 23;  // RTD buzzer output
 
-// ------------ TEENSY LIBRARIES ------------
+// ====== CAN SETTINGS ======
+constexpr unsigned int CAN_BAUD_RATE = 500000;
+constexpr unsigned int CAN_TIMEOUT_MS = 500;
 
-// ------------ CAR LIBRARIES ------------
-#include "apps.h"
+// ====== TIMING ======
+constexpr unsigned int STATUS_REQ_INTERVAL_MS = 200;
+constexpr unsigned int RPM_REQ_INTERVAL_MS    = 200;
 
-// Undefine Arduino's min/max macros to avoid conflicts with C++ standard
-// library
-#undef max
-#undef min
-
-#include <limits>
-
-// VCU-HACK: Set to true to bypass BMS checks for bench testing without a BMS.
-// TODO: MUST BE FALSE FOR VEHICLE OPERATION.
-const bool BENCH_TESTING_MODE = true;
-#endif // HEADER_H
+// ====== UTILITY ======
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))

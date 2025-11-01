@@ -12,9 +12,9 @@
 #include <Adafruit_Sensor.h>
 
 // --- Pin definitions (update if needed) ---
-#define BRAKE_PRESSURE_SENSOR_PIN_FRONT A0   // TODO: correct analog pin
-#define BRAKE_PRESSURE_SENSOR_PIN_REAR  A1   // TODO: correct analog pin
-#define BRAKE_LIGHT_PIN                 5    // TODO: correct output pin
+constexpr int BRAKE_PRESSURE_SENSOR_PIN_FRONT = A0;   // TODO: correct analog pin
+constexpr int BRAKE_PRESSURE_SENSOR_PIN_REAR  = A1;   // TODO: correct analog pin
+constexpr int BRAKE_LIGHT_PIN                 = LED_BUILTIN;    // TODO: correct output pin
 
 // --- Thresholds (placeholder values, calibrate on car) ---
 static constexpr int   BRAKE_THRESHOLD_DELTA  = 10;   // TODO: ADC counts above idle
@@ -30,9 +30,18 @@ static constexpr float     ACCEL_EWMA_ALPHA = 0.2f; // low-pass smoothing factor
 #define DEBUG_MODE 1
 #endif
 
+struct BrakeData {
+  int front_pressure;
+  int rear_pressure;
+  int combined_pressure;
+  bool brake_active;   // true when brake light logic is ON
+  float decel_ms2;
+  float tilt_deg;
+};
+
 // --- Function declarations ---
 void brake_light_setup();
-void brake_light_update();
+BrakeData brake_light_update();   // returns current readings
 void brake_recalibrate_idle();
 bool brake_initialize_mpu();
 void brake_calibrate_imu_rest();

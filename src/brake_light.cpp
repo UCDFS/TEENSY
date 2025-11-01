@@ -120,7 +120,7 @@ void brake_light_setup() {
   }
 }
 
-void brake_light_update() {
+BrakeData brake_light_update() {
   // --- read pressures ---
   brakePressureFront    = readAnalogAvg(BRAKE_PRESSURE_SENSOR_PIN_FRONT);
   brakePressureRear     = readAnalogAvg(BRAKE_PRESSURE_SENSOR_PIN_REAR);
@@ -188,6 +188,15 @@ void brake_light_update() {
       last = millis();
     }
   }
+
+  BrakeData d{};
+  d.front_pressure    = brakePressureFront;
+  d.rear_pressure     = brakePressureRear;
+  d.combined_pressure = brakePressureCombined;
+  d.brake_active      = brake_light_on;
+  d.decel_ms2        = decel_ms2;
+  d.tilt_deg         = tilt_deg;
+  return d;
 }
 
 void brake_recalibrate_idle() {
