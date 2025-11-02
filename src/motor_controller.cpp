@@ -19,6 +19,8 @@ static constexpr uint32_t BAMOCAR_RX_ID = 0x201; // us -> inverter
 // ---------- State ----------
 static bool readyToDrive = false;
 static bool faultActive  = false;
+static bool rtdRequestPending = false;
+static uint32_t tPendingReady = 0;
 static uint16_t statusWord = 0;
 static int rpmFeedback = 0;
 static float dcBusVoltage = 0.0f;
@@ -48,6 +50,47 @@ static inline void lockDrive()   { send3(0x51, 0x04, 0x00); }
 static inline void enableDrive() { send3(0x51, 0x00, 0x00); }
 static inline void setTorqueRaw(int16_t tq) { send3(0x90, tq & 0xFF, (tq >> 8) & 0xFF); }
 
+static void handleStatusWord(uint16_t word) {
+  statusWord = word;
+  faultActive = (word & 0x0040) != 0;
+  const bool enableBit = (word & 0x0001) != 0;
+
+  if (faultActive) {
+    if (readyToDrive && DEBUG_MODE) Serial.println("Inverter fault. RTD cleared.");
+    readyToDrive = false;
+    if (rtdRequestPending && DEBUG_MODE) Serial.println("Pending RTD cancelled due to fault.");
+    rtdRequestPending = false;
+    tPendingReady = 0;
+    if (tBuzzerOff) {
+      if (BUZZER_PIN >= 0) digitalWrite(BUZZER_PIN, LOW);
+      tBuzzerOff = 0;
+    }
+    return;
+  }
+
+  if (enableBit) {
+    if (!readyToDrive) {
+      readyToDrive = true;
+      rtdRequestPending = false;
+      tPendingReady = 0;
+      if (BUZZER_PIN >= 0) {
+        pinMode(BUZZER_PIN, OUTPUT);
+        digitalWrite(BUZZER_PIN, HIGH);
+        tBuzzerOff = millis() + 3000;
+      }
+      if (DEBUG_MODE) Serial.println("Inverter confirmed RTD.");
+    }
+  } else if (readyToDrive) {
+    readyToDrive = false;
+    tPendingReady = 0;
+    if (tBuzzerOff) {
+      if (BUZZER_PIN >= 0) digitalWrite(BUZZER_PIN, LOW);
+      tBuzzerOff = 0;
+    }
+    if (DEBUG_MODE) Serial.println("Inverter exited RTD state.");
+  }
+}
+
 static void readCAN() {
   CAN_message_t msg;
   while (Can1.read(msg)) {
@@ -56,12 +99,8 @@ static void readCAN() {
     const uint8_t reg = msg.buf[0];
 
     if (reg == 0x40) { // status word
-      statusWord = uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8);
-      faultActive = (statusWord & 0x0040);
-      if (faultActive && readyToDrive) {
-        readyToDrive = false;
-        if (DEBUG_MODE) Serial.println("Bamocar fault. RTD dropped.");
-      }
+      const uint16_t word = uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8);
+      handleStatusWord(word);
     } else if (reg == 0x30) { // rpm
       rpmFeedback = int16_t(uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8));
     } else if (reg == 0xEB) { // dc bus voltage 0.1 V/LSB
@@ -71,7 +110,7 @@ static void readCAN() {
 }
 
 static bool brakeActive() {
-  // Brake lamp output serves as the activation signal; HIGH implies pedal pressed
+  // Brake light output serves as the activation signal; HIGH implies pedal pressed
   pinMode(BrakeLight::BRAKE_LIGHT_PIN, INPUT); // ensure not driving it here
   return digitalRead(BrakeLight::BRAKE_LIGHT_PIN) == HIGH;
 }
@@ -82,33 +121,35 @@ static bool rtdButtonPressed() {
 }
 
 static void tryEnterRTD() {
-  if (readyToDrive || faultActive) return;
-  if (!rtdButtonPressed()) return; // TODO: add brakeActive() check to comply with 
-
   static bool holding = false;
   static uint32_t tStart = 0;
+
+  if (readyToDrive || faultActive || rtdRequestPending) {
+    holding = false;
+    return;
+  }
+
+  if (!brakeActive() || !rtdButtonPressed()) {
+    holding = false;
+    return;
+  }
 
   if (!holding) {
     holding = true;
     tStart = millis();
   }
+
   if (millis() - tStart < 1000) return;
 
-  // conditions met for at least 1 s
   clearErrors();
   lockDrive();
   delay(50);
   enableDrive();
 
-  readyToDrive = true;
+  rtdRequestPending = true;
+  tPendingReady = millis();
+  if (DEBUG_MODE) Serial.println("RTD enable request sent.");
 
-  if (BUZZER_PIN >= 0) {
-    pinMode(BUZZER_PIN, OUTPUT);
-    digitalWrite(BUZZER_PIN, HIGH);
-    tBuzzerOff = millis() + 3000; // 3 s tone
-  }
-
-  // reset hold so a second press later must rehold
   holding = false;
 }
 
@@ -147,6 +188,11 @@ void init() {
 void update() {
   Can1.events();
   readCAN();
+
+  if (rtdRequestPending && (millis() - tPendingReady) > 2000) {
+    rtdRequestPending = false;
+    if (DEBUG_MODE) Serial.println("RTD enable request timed out.");
+  }
 
   // re-issue cyclic requests every few seconds for keep-alive robustness
   if (millis() - tLastReissue > 5000) {
