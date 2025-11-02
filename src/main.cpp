@@ -12,7 +12,6 @@
 #include "motor_controller.h"
 #include "dashboard.h"
 #include "helpers.h"
-#include "logging.h"
 
 // --- Globals ---
 static bool torqueCutActive = false;
@@ -26,13 +25,14 @@ void setup() {
   BrakeLight::init();
   MotorController::init();
   Dashboard::init(Serial1);  // Nextion connected on Serial1
-  // Logging::init();
+  // Logging::init();           // TODO: logging right now causes bottleneck or something
+                                //       so gotta figure out why
 
 }
 
 void loop() {
   // --- Sensor updates ---
-  auto brake = BrakeLight::update();
+  BrakeLight::BrakeData brake = BrakeLight::update();
   auto apps  = APPS::get_apps_reading();
 
   // --- Safety: APPS + Brake conflict (FSUK T11.8.10) ---

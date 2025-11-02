@@ -6,6 +6,7 @@
  */
 
 #include "dashboard_helpers.h"
+#include <Arduino.h>
 
 
 void setText(NexText &obj, const char *value) {

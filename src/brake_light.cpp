@@ -5,7 +5,6 @@
  * @date 2025/2026
  */
 #include "brake_light.h"
-#include "header.h"
 
 namespace BrakeLight {
 
@@ -212,6 +211,10 @@ void recalibrate_idle() {
     Serial.print("Recalibrated idle. New threshold=");
     Serial.println(dynamicBrakeThreshold);
   }
+}
+
+bool is_active() {
+  return brakeLightOn;
 }
 
 } // namespace BrakeLight

@@ -7,11 +7,8 @@
 
 #pragma once
 #include <Arduino.h>
-#include "brake_light.h"
 
 namespace MotorController {
-
-using BrakeData = BrakeLight::BrakeData;
 
 inline constexpr int DEBUG_MODE = 1; // 0 disables module logging
 

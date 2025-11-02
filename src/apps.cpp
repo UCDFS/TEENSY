@@ -9,17 +9,17 @@
 
 #include "apps.h"
 #include <cmath>  // For std::fabs
-#include <limits> // For std::numeric_limits
-using namespace APPS;
 
-std::pair<float, float> APPS::get_raw_values() {
+namespace APPS {
+
+std::pair<float, float> get_raw_values() {
   int apps_1_raw = analogRead(APPS_1_PIN);
   int apps_2_raw = analogRead(APPS_2_PIN);
-  return std::pair<float, float>(apps_1_raw, apps_2_raw);
+  return {apps_1_raw, apps_2_raw};
 }
 
 std::pair<float, float>
-APPS::get_percentage_values(std::pair<float, float> raws) {
+get_percentage_values(std::pair<float, float> raws) {
 
   // Convert raw ADC values directly to percentage (0-100) - INVERTED values
   // Note: values decrease as pedal is pressed, so we invert the calculation
@@ -32,10 +32,10 @@ APPS::get_percentage_values(std::pair<float, float> raws) {
   apps_1_percent = constrain(apps_1_percent, 0.0, 100.0);
   apps_2_percent = constrain(apps_2_percent, 0.0, 100.0);
 
-  return std::pair<float, float>(apps_1_percent, apps_2_percent);
+  return {apps_1_percent, apps_2_percent};
 }
 
-bool APPS::check_plausiblity(std::pair<float, float> percentages) {
+bool check_plausiblity(std::pair<float, float> percentages) {
 
   // Check for implausibility (FSUK T11.8.9: deviation > 10%)
   if (std::fabs(percentages.first - percentages.second) >
@@ -53,7 +53,7 @@ bool APPS::check_plausiblity(std::pair<float, float> percentages) {
   }
 }
 
-bool APPS::check_integrity(std::pair<float, float> raws) {
+bool check_integrity(std::pair<float, float> raws) {
 
   // Verify electrical plausiblity as per T11.9.2
   if (raws.first > APPS1_RAW_MAX || raws.first < APPS1_RAW_MIN ||
@@ -89,7 +89,7 @@ bool APPS::check_integrity(std::pair<float, float> raws) {
  */
 // TODO: If Apps>= 25 && Brake pedal is pressed for over 500ms, torque needs to
 //  be 0nm. Logic should be handled in main.cpp for this.
-APPS::AppsReading APPS::get_apps_reading() {
+AppsReading get_apps_reading() {
   auto raws = get_raw_values();
   auto percentages = get_percentage_values(raws);
   bool plausibility = check_plausiblity(percentages);
@@ -114,13 +114,15 @@ APPS::AppsReading APPS::get_apps_reading() {
   }
 
   if (!integrity) {
-    return AppsReading(AppsStatus::Fault, 0.0, percentages.first,
-                       percentages.second);
+    return {AppsStatus::Fault, 0.0, percentages.first,
+            percentages.second};
   } else if (!plausibility) {
-    return AppsReading(AppsStatus::Implausible, 0.0, percentages.first,
-                       percentages.second);
+    return {AppsStatus::Implausible, 0.0, percentages.first,
+            percentages.second};
   } else {
-    return AppsReading(AppsStatus::OK, average_percent, percentages.first,
-                       percentages.second);
+    return {AppsStatus::OK, average_percent, percentages.first,
+            percentages.second};
   }
 }
+
+} // namespace APPS

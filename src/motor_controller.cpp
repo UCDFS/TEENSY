@@ -8,7 +8,7 @@
 #include "motor_controller.h"
 #include "header.h"
 #include <FlexCAN_T4.h>
-#include "logging.h"
+#include "brake_light.h"
 
 
 // ---------- CAN ----------
@@ -113,9 +113,7 @@ static void readCAN() {
 }
 
 static bool brakeActive() {
-  // Brake light output serves as the activation signal; HIGH implies pedal pressed
-  pinMode(BrakeLight::BRAKE_LIGHT_PIN, INPUT); // ensure not driving it here
-  return digitalRead(BrakeLight::BRAKE_LIGHT_PIN) == HIGH;
+  return BrakeLight::is_active();
 }
 
 static bool rtdButtonPressed() {

@@ -48,4 +48,7 @@ void calibrate_imu_rest();
 float compute_forward_tilt_deg(float ay_ms2, float az_ms2);
 float read_decel_ms2(float ax_ms2);
 
+// Query current brake light state (true when logic is ON)
+bool is_active();
+
 } // namespace BrakeLight

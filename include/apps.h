@@ -21,9 +21,7 @@
                                                                                \
  */
 
-#include "core_pins.h"
-#include "usb_serial.h"
-#include "wiring.h"
+#include <Arduino.h>
 #include <utility>
 
 namespace APPS {
