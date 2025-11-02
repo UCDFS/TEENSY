@@ -11,11 +11,9 @@
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 
-#ifndef DEBUG_MODE
-#define DEBUG_MODE 1
-#endif
-
 namespace BrakeLight {
+
+inline constexpr int DEBUG_MODE = 1; // 0: off, higher values increase verbosity
 
 // --- Pin definitions (update if needed) ---
 constexpr int BRAKE_PRESSURE_SENSOR_PIN_FRONT = A0;   // TODO: correct analog pin
@@ -42,7 +40,7 @@ struct BrakeData {
 };
 
 // --- Function declarations ---
-void setup();
+void init();
 BrakeData update();   // returns current readings
 void recalibrate_idle();
 bool initialize_mpu();

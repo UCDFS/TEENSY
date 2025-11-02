@@ -54,11 +54,14 @@ static void handleStatusWord(uint16_t word) {
   statusWord = word;
   faultActive = (word & 0x0040) != 0;
   const bool enableBit = (word & 0x0001) != 0;
+  const bool readyBit  = (word & 0x0004) != 0;
 
   if (faultActive) {
-    if (readyToDrive && DEBUG_MODE) Serial.println("Inverter fault. RTD cleared.");
+    if (readyToDrive && MotorController::DEBUG_MODE)
+      Serial.println("Inverter fault. RTD cleared.");
     readyToDrive = false;
-    if (rtdRequestPending && DEBUG_MODE) Serial.println("Pending RTD cancelled due to fault.");
+    if (rtdRequestPending && MotorController::DEBUG_MODE)
+      Serial.println("Pending RTD cancelled due to fault.");
     rtdRequestPending = false;
     tPendingReady = 0;
     if (tBuzzerOff) {
@@ -68,7 +71,7 @@ static void handleStatusWord(uint16_t word) {
     return;
   }
 
-  if (enableBit) {
+  if (enableBit && readyBit) {
     if (!readyToDrive) {
       readyToDrive = true;
       rtdRequestPending = false;
@@ -78,7 +81,7 @@ static void handleStatusWord(uint16_t word) {
         digitalWrite(BUZZER_PIN, HIGH);
         tBuzzerOff = millis() + 3000;
       }
-      if (DEBUG_MODE) Serial.println("Inverter confirmed RTD.");
+  if (MotorController::DEBUG_MODE) Serial.println("Inverter confirmed RTD.");
     }
   } else if (readyToDrive) {
     readyToDrive = false;
@@ -87,14 +90,14 @@ static void handleStatusWord(uint16_t word) {
       if (BUZZER_PIN >= 0) digitalWrite(BUZZER_PIN, LOW);
       tBuzzerOff = 0;
     }
-    if (DEBUG_MODE) Serial.println("Inverter exited RTD state.");
+  if (MotorController::DEBUG_MODE) Serial.println("Inverter exited RTD state.");
   }
 }
 
 static void readCAN() {
   CAN_message_t msg;
   while (Can1.read(msg)) {
-    Logging::logCANFrame(msg, "RX");
+    // Logging::logCANFrame(msg, "RX");
     if (msg.id != BAMOCAR_TX_ID || msg.len < 3) continue;
     const uint8_t reg = msg.buf[0];
 
@@ -148,7 +151,7 @@ static void tryEnterRTD() {
 
   rtdRequestPending = true;
   tPendingReady = millis();
-  if (DEBUG_MODE) Serial.println("RTD enable request sent.");
+  if (MotorController::DEBUG_MODE) Serial.println("RTD enable request sent.");
 
   holding = false;
 }
@@ -157,7 +160,7 @@ static void tryEnterRTD() {
 namespace MotorController {
 
 void init() {
-  if (DEBUG_MODE) Serial.println("Motor Controller init");
+  if (MotorController::DEBUG_MODE) Serial.println("Motor Controller init");
 
   pinMode(RTD_BUTTON_PIN, INPUT_PULLUP);
   if (BUZZER_PIN >= 0) {
@@ -191,7 +194,7 @@ void update() {
 
   if (rtdRequestPending && (millis() - tPendingReady) > 2000) {
     rtdRequestPending = false;
-    if (DEBUG_MODE) Serial.println("RTD enable request timed out.");
+  if (MotorController::DEBUG_MODE) Serial.println("RTD enable request timed out.");
   }
 
   // re-issue cyclic requests every few seconds for keep-alive robustness

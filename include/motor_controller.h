@@ -13,6 +13,8 @@ namespace MotorController {
 
 using BrakeData = BrakeLight::BrakeData;
 
+inline constexpr int DEBUG_MODE = 1; // 0 disables module logging
+
 // Init pins and CAN. rtdButtonPin is active-low. buzzerPin optional (-1 to disable)
 void init();
 

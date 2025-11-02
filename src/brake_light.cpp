@@ -5,6 +5,7 @@
  * @date 2025/2026
  */
 #include "brake_light.h"
+#include "header.h"
 
 namespace BrakeLight {
 
@@ -97,7 +98,7 @@ void calibrate_imu_rest() {
 }
 
 // ---- Main logic ----
-void setup() {
+void init() {
   pinMode(BRAKE_LIGHT_PIN, OUTPUT);
   digitalWrite(BRAKE_LIGHT_PIN, LOW);
 

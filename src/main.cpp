@@ -21,13 +21,13 @@ void setup() {
   Serial.begin(115200);
   delay(300);
 
-  // Logging::init();
-
   if (DEBUG_MODE) Serial.println("\n--- UCDFS Testing ECU Boot ---");
 
-  BrakeLight::setup();
+  BrakeLight::init();
   MotorController::init();
   Dashboard::init(Serial1);  // Nextion connected on Serial1
+  // Logging::init();
+
 }
 
 void loop() {
@@ -49,9 +49,13 @@ void loop() {
   MotorController::update();
 
   // --- Torque command with safety redundancy ---
+  constexpr int16_t kMaxTorqueCounts = 32767; // full-scale Bamocar torque command
+  constexpr float   kMaxTorquePercent = 100.0f;
+
   int16_t torqueCounts = 0;
   if (MotorController::ready() && !MotorController::faulted() && !torqueCutActive) {
-    torqueCounts = map((int)apps.value, 0, 100, 0, 2000);
+    float clampedPercent = constrain(apps.value, 0.0f, kMaxTorquePercent);
+    torqueCounts = static_cast<int16_t>(kMaxTorqueCounts * (clampedPercent / kMaxTorquePercent));
   }
 
   // Always explicitly send the command — ensures inverter sees zero on faults

@@ -88,7 +88,7 @@ bool APPS::check_integrity(std::pair<float, float> raws) {
  * position
  */
 // TODO: If Apps>= 25 && Brake pedal is pressed for over 500ms, torque needs to
-// be 0nm. Logic should be handled in main.cpp for this.
+//  be 0nm. Logic should be handled in main.cpp for this.
 APPS::AppsReading APPS::get_apps_reading() {
   auto raws = get_raw_values();
   auto percentages = get_percentage_values(raws);
