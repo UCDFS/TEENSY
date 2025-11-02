@@ -26,7 +26,7 @@ void setup() {
   if (DEBUG_MODE) Serial.println("\n--- UCDFS Testing ECU Boot ---");
 
   BrakeLight::setup();
-  MotorController::init(RTD_BUTTON_PIN, BUZZER_PIN);
+  MotorController::init();
   Dashboard::init(Serial1);  // Nextion connected on Serial1
 }
 

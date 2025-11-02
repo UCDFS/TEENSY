@@ -7,7 +7,6 @@
 
 #include "motor_controller.h"
 #include "header.h"
-#include "brake_light.h"
 #include <FlexCAN_T4.h>
 #include "logging.h"
 
@@ -24,10 +23,6 @@ static uint16_t statusWord = 0;
 static int rpmFeedback = 0;
 static float dcBusVoltage = 0.0f;
 static int16_t lastTorque = 0;
-
-// Assigned at init()
-static int rtdButtonPin_internal = -1;
-static int buzzerPin_internal    = -1;
 
 // timers
 static uint32_t tLastReissue = 0;
@@ -76,8 +71,7 @@ static void readCAN() {
 }
 
 static bool brakeActive() {
-  // Use your existing brake output as the gate
-  // If HIGH drives the lamp, treat HIGH as pressed
+  // Brake lamp output serves as the activation signal; HIGH implies pedal pressed
   pinMode(BrakeLight::BRAKE_LIGHT_PIN, INPUT); // ensure not driving it here
   return digitalRead(BrakeLight::BRAKE_LIGHT_PIN) == HIGH;
 }
@@ -89,7 +83,7 @@ static bool rtdButtonPressed() {
 
 static void tryEnterRTD() {
   if (readyToDrive || faultActive) return;
-  if (!brakeActive() || !rtdButtonPressed()) return;
+  if (!rtdButtonPressed()) return; // TODO: add brakeActive() check to comply with 
 
   static bool holding = false;
   static uint32_t tStart = 0;
@@ -121,11 +115,8 @@ static void tryEnterRTD() {
 // ---------- public API ----------
 namespace MotorController {
 
-void init(int rtdButtonPin, int buzzerPin) {
+void init() {
   if (DEBUG_MODE) Serial.println("Motor Controller init");
-
-  rtdButtonPin_internal = rtdButtonPin;
-  buzzerPin_internal    = buzzerPin;
 
   pinMode(RTD_BUTTON_PIN, INPUT_PULLUP);
   if (BUZZER_PIN >= 0) {

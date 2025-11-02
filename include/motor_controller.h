@@ -7,21 +7,14 @@
 
 #pragma once
 #include <Arduino.h>
+#include "brake_light.h"
 
 namespace MotorController {
 
-// Simple brake data contract from your brake module
-struct BrakeData {
-  float front_pressure;
-  float rear_pressure;
-  bool  brake_active;
-};
+using BrakeData = BrakeLight::BrakeData;
 
 // Init pins and CAN. rtdButtonPin is active-low. buzzerPin optional (-1 to disable)
-void init(int rtdButtonPin, int buzzerPin = -1);
-
-// Provide a function that returns current brake data
-void setBrakeProvider(BrakeData (*provider)());
+void init();
 
 // Call each loop
 void update();
