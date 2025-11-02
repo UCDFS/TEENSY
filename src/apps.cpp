@@ -1,5 +1,5 @@
 /**
- * @file apps_sensor_reader.cpp
+ * @file apps.cpp
  * @brief Handles reading and validating Accelerator Pedal Position Sensors
  * (APPS)
  * @author Shane Whelan (UCD Formula Student)

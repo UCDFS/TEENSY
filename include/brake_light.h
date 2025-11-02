@@ -2,7 +2,7 @@
  * @file brake_light.h
  * @brief Header file for brake light control based on brake pressure and deceleration.
  * @author Charlie Zhang (UCD Formula Student)
- * @date 19-Oct-2025
+ * @date 2025/2026
  */
 
 
@@ -10,6 +10,12 @@
 #include <Arduino.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
+
+#ifndef DEBUG_MODE
+#define DEBUG_MODE 1
+#endif
+
+namespace BrakeLight {
 
 // --- Pin definitions (update if needed) ---
 constexpr int BRAKE_PRESSURE_SENSOR_PIN_FRONT = A0;   // TODO: correct analog pin
@@ -26,10 +32,6 @@ static constexpr float FORWARD_TILT_DEG       = 6.0f; // degrees
 static constexpr uint16_t IMU_CALIB_SAMPLES = 1500; // TODO: tune boot time vs stability
 static constexpr float     ACCEL_EWMA_ALPHA = 0.2f; // low-pass smoothing factor
 
-#ifndef DEBUG_MODE
-#define DEBUG_MODE 1
-#endif
-
 struct BrakeData {
   int front_pressure;
   int rear_pressure;
@@ -40,10 +42,12 @@ struct BrakeData {
 };
 
 // --- Function declarations ---
-void brake_light_setup();
-BrakeData brake_light_update();   // returns current readings
-void brake_recalibrate_idle();
-bool brake_initialize_mpu();
-void brake_calibrate_imu_rest();
-float brake_compute_forward_tilt_deg(float ay_ms2, float az_ms2);
-float brake_read_decel_ms2(float ax_ms2);
+void setup();
+BrakeData update();   // returns current readings
+void recalibrate_idle();
+bool initialize_mpu();
+void calibrate_imu_rest();
+float compute_forward_tilt_deg(float ay_ms2, float az_ms2);
+float read_decel_ms2(float ax_ms2);
+
+} // namespace BrakeLight

@@ -1,13 +1,13 @@
-#ifndef APPS_H
-#define APPS_H
 /**
  * @file apps.h
- * @brief Accelerator Pedal Position Sensor; Determines motor output and
- * accelerator output plausibility
+ * @brief Accelerator Pedal Position Sensor interface for plausibility checks and pedal mapping.
  * @author Asher Olgeirson (UCD Formula Student)
  * @author Shane Whelan (UCD Formula Student)
- * @date 2025-2026
- * */
+ * @date 2025/2026
+ */
+
+#ifndef APPS_H
+#define APPS_H
 
 /* Accelerator Pedal Position Sensor                            \
   See T.11.8 and T.11.9 for more info                                          \

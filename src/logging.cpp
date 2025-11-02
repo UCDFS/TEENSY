@@ -1,3 +1,10 @@
+/**
+ * @file logging.cpp
+ * @brief Provides SD-card based logging utilities for CAN traffic.
+ * @author Shane Whelan (UCD Formula Student)
+ * @date 2025/2026
+ */
+
 #include "logging.h"
 
 static File logFile;

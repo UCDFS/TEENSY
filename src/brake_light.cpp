@@ -2,27 +2,29 @@
  * @file brake_light.cpp
  * @brief Implementation of brake light control based on brake pressure and deceleration.
  * @author Charlie Zhang (UCD Formula Student)
- * @date 19-Oct-2025
+ * @date 2025/2026
  */
 #include "brake_light.h"
 
+namespace BrakeLight {
+
 // ---- State ----
-Adafruit_MPU6050 mpu;
-bool  mpuInitialized = false;
+static Adafruit_MPU6050 mpu;
+static bool  mpuInitialized = false;
 
-int   brakePressureFront = 0;
-int   brakePressureRear  = 0;
-int   brakePressureCombined = 0;
+static int   brakePressureFront = 0;
+static int   brakePressureRear  = 0;
+static int   brakePressureCombined = 0;
 
-int   brakeIdleValueFront = 0;
-int   brakeIdleValueRear  = 0;
-int   brakeIdleValueCombined = 0;
-int   dynamicBrakeThreshold  = 0;
+static int   brakeIdleValueFront = 0;
+static int   brakeIdleValueRear  = 0;
+static int   brakeIdleValueCombined = 0;
+static int   dynamicBrakeThreshold  = 0;
 
-bool  brake_light_on = false;
+static bool  brakeLightOn = false;
 
-float accelRestX_ms2 = 0.0f, accelRestY_ms2 = 0.0f, accelRestZ_ms2 = 0.0f;
-float ax_f_ms2 = 0.0f, ay_f_ms2 = 0.0f, az_f_ms2 = 0.0f;
+static float accelRestX_ms2 = 0.0f, accelRestY_ms2 = 0.0f, accelRestZ_ms2 = 0.0f;
+static float ax_f_ms2 = 0.0f, ay_f_ms2 = 0.0f, az_f_ms2 = 0.0f;
 
 // ---- Helpers ----
 static inline int readAnalogAvg(uint8_t pin, uint8_t n=8) {
@@ -33,17 +35,17 @@ static inline int readAnalogAvg(uint8_t pin, uint8_t n=8) {
 
 static inline float rad2deg(float r) { return r * 57.2957795f; }
 
-float brake_compute_forward_tilt_deg(float ay_ms2, float az_ms2) {
+float compute_forward_tilt_deg(float ay_ms2, float az_ms2) {
   float angle_rad = atan2f(ay_ms2 - accelRestY_ms2, az_ms2 - accelRestZ_ms2);
   return rad2deg(angle_rad);
 }
 
-float brake_read_decel_ms2(float ax_ms2) {
+float read_decel_ms2(float ax_ms2) {
   return -(ax_ms2 - accelRestX_ms2);
 }
 
 // ---- IMU init + calibration ----
-bool brake_initialize_mpu() {
+bool initialize_mpu() {
   if (mpuInitialized) return true;
   if (!mpu.begin()) {
     if (DEBUG_MODE) Serial.println("MPU6050 not found!");
@@ -64,7 +66,7 @@ bool brake_initialize_mpu() {
   return true;
 }
 
-void brake_calibrate_imu_rest() {
+void calibrate_imu_rest() {
   if (!mpuInitialized) return;
   if (DEBUG_MODE) {
     Serial.print("Calibrating IMU rest (" );
@@ -95,7 +97,7 @@ void brake_calibrate_imu_rest() {
 }
 
 // ---- Main logic ----
-void brake_light_setup() {
+void setup() {
   pinMode(BRAKE_LIGHT_PIN, OUTPUT);
   digitalWrite(BRAKE_LIGHT_PIN, LOW);
 
@@ -115,12 +117,12 @@ void brake_light_setup() {
     Serial.println(dynamicBrakeThreshold);
   }
 
-  if (brake_initialize_mpu()) {
-    brake_calibrate_imu_rest();
+  if (initialize_mpu()) {
+    calibrate_imu_rest();
   }
 }
 
-BrakeData brake_light_update() {
+BrakeData update() {
   // --- read pressures ---
   brakePressureFront    = readAnalogAvg(BRAKE_PRESSURE_SENSOR_PIN_FRONT);
   brakePressureRear     = readAnalogAvg(BRAKE_PRESSURE_SENSOR_PIN_REAR);
@@ -136,8 +138,8 @@ BrakeData brake_light_update() {
     ay_f_ms2 = ACCEL_EWMA_ALPHA*a.acceleration.y + (1.0f-ACCEL_EWMA_ALPHA)*ay_f_ms2;
     az_f_ms2 = ACCEL_EWMA_ALPHA*a.acceleration.z + (1.0f-ACCEL_EWMA_ALPHA)*az_f_ms2;
 
-    decel_ms2 = brake_read_decel_ms2(ax_f_ms2);
-    tilt_deg  = brake_compute_forward_tilt_deg(ay_f_ms2, az_f_ms2);
+    decel_ms2 = read_decel_ms2(ax_f_ms2);
+    tilt_deg  = compute_forward_tilt_deg(ay_f_ms2, az_f_ms2);
   }
 
   bool want_on = false;
@@ -156,18 +158,18 @@ BrakeData brake_light_update() {
 
   // Apply hysteresis
   if (want_on) {
-    if (!brake_light_on) {
+    if (!brakeLightOn) {
       digitalWrite(BRAKE_LIGHT_PIN, HIGH);
-      brake_light_on = true;
+      brakeLightOn = true;
       if (DEBUG_MODE >= 2) Serial.println("Brake light ON");
     }
   } else {
     bool below_pressure = brakePressureCombined < (dynamicBrakeThreshold - BRAKE_LIGHT_HYSTERESIS);
     bool below_decel    = decel_ms2 < (REGEN_DECEL_THRESHOLD * 0.8f);
     bool below_tilt     = tilt_deg  < (FORWARD_TILT_DEG - 1.0f);
-    if (brake_light_on && below_pressure && below_decel && below_tilt) {
+    if (brakeLightOn && below_pressure && below_decel && below_tilt) {
       digitalWrite(BRAKE_LIGHT_PIN, LOW);
-      brake_light_on = false;
+      brakeLightOn = false;
       if (DEBUG_MODE >= 2) Serial.println("Brake light OFF");
     }
   }
@@ -184,7 +186,7 @@ BrakeData brake_light_update() {
       Serial.print(" tilt=");
       Serial.print(tilt_deg,1);
       Serial.print(" light=");
-      Serial.println(brake_light_on ? "ON" : "OFF");
+      Serial.println(brakeLightOn ? "ON" : "OFF");
       last = millis();
     }
   }
@@ -193,13 +195,13 @@ BrakeData brake_light_update() {
   d.front_pressure    = brakePressureFront;
   d.rear_pressure     = brakePressureRear;
   d.combined_pressure = brakePressureCombined;
-  d.brake_active      = brake_light_on;
+  d.brake_active      = brakeLightOn;
   d.decel_ms2        = decel_ms2;
   d.tilt_deg         = tilt_deg;
   return d;
 }
 
-void brake_recalibrate_idle() {
+void recalibrate_idle() {
   brakePressureFront    = readAnalogAvg(BRAKE_PRESSURE_SENSOR_PIN_FRONT);
   brakePressureRear     = readAnalogAvg(BRAKE_PRESSURE_SENSOR_PIN_REAR);
   brakePressureCombined = (brakePressureFront + brakePressureRear) / 2;
@@ -210,3 +212,5 @@ void brake_recalibrate_idle() {
     Serial.println(dynamicBrakeThreshold);
   }
 }
+
+} // namespace BrakeLight

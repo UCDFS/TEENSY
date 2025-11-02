@@ -1,3 +1,10 @@
+/**
+ * @file helpers.cpp
+ * @brief Implements common helper utilities shared across the ECU.
+ * @author Shane Whelan (UCD Formula Student)
+ * @date 2025/2026
+ */
+
 #include "helpers.h"
 
 namespace Helper {

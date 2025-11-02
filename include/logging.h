@@ -1,3 +1,10 @@
+/**
+ * @file logging.h
+ * @brief SD-card logging interface for CAN traffic capture.
+ * @author Shane Whelan (UCD Formula Student)
+ * @date 2025/2026
+ */
+
 #pragma once
 #include <Arduino.h>
 #include <SD.h>

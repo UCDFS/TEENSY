@@ -1,8 +1,8 @@
 /**
  * @file main.cpp
- * @brief Formula Student Testing ECU – integrates APPS, Brake, Motor Controller, and Dashboard.
- * @author
- * @date 2025
+ * @brief Formula Student testing ECU integrates APPS, brake, motor controller, and dashboard subsystems.
+ * @author Shane Whelan (UCD Formula Student)
+ * @date 2025/2026
  */
 
 #include <Arduino.h>
@@ -15,30 +15,27 @@
 #include "logging.h"
 
 // --- Globals ---
-static uint32_t lastTorqueCut = 0;
 static bool torqueCutActive = false;
 
 void setup() {
   Serial.begin(115200);
   delay(300);
 
-  Logging::init();
+  // Logging::init();
 
+  if (DEBUG_MODE) Serial.println("\n--- UCDFS Testing ECU Boot ---");
 
-  if (DEBUG_MODE) Serial.println("\n--- FS Testing ECU Boot ---");
-
-  brake_light_setup();
+  BrakeLight::setup();
   MotorController::init(RTD_BUTTON_PIN, BUZZER_PIN);
-  Dashboard::init();
+  Dashboard::init(Serial1);  // Nextion connected on Serial1
 }
 
 void loop() {
   // --- Sensor updates ---
-  auto brake = brake_light_update();
+  auto brake = BrakeLight::update();
   auto apps  = APPS::get_apps_reading();
 
   // --- Safety: APPS + Brake conflict (FSUK T11.8.10) ---
-  // If throttle >25% and brake active >500 ms → torque = 0
   static uint32_t brakeStart = 0;
   if (brake.brake_active && apps.value >= 25.0) {
     if (brakeStart == 0) brakeStart = millis();
@@ -51,26 +48,33 @@ void loop() {
   // --- Motor controller update ---
   MotorController::update();
 
-// --- Torque command with safety redundancy ---
-int16_t torqueCounts = 0;
-if (MotorController::ready() && !MotorController::faulted() && !torqueCutActive) {
-  torqueCounts = map((int)apps.value, 0, 100, 0, 2000);
-}
+  // --- Torque command with safety redundancy ---
+  int16_t torqueCounts = 0;
+  if (MotorController::ready() && !MotorController::faulted() && !torqueCutActive) {
+    torqueCounts = map((int)apps.value, 0, 100, 0, 2000);
+  }
 
-// Always explicitly send the command — ensures inverter sees zero on faults
-MotorController::setTorque(torqueCounts);
+  // Always explicitly send the command — ensures inverter sees zero on faults
+  MotorController::setTorque(torqueCounts);
 
+  // --- Dashboard update ---
+  static uint32_t lastDash = 0;
+  if (millis() - lastDash > 100) {
+    float speedKmh = Helper::rpm_to_kmh(MotorController::rpm());
 
-static uint32_t lastDash = 0;
-if (millis() - lastDash > 100) {
-  float speedKmh = Helper::rpm_to_kmh(MotorController::rpm());
-  Dashboard::updateTelemetry(speedKmh, MotorController::rpm());
-  Dashboard::updateSensors(apps.APPS1, apps.APPS2,
-                           brake.front_pressure, brake.rear_pressure);
-  lastDash = millis();
-}
+    Dashboard::updateTelemetry(speedKmh,
+                               MotorController::rpm(),
+                               MotorController::ready());
 
+    Dashboard::updateSensors(apps.APPS1,
+                             apps.APPS2,
+                             brake.front_pressure,
+                             brake.rear_pressure);
 
+    Dashboard::updateAcceleratorBar(apps.value);
+    Dashboard::updateBrakeLightBar(brake.brake_active);
+    lastDash = millis();
+  }
 
   // --- Periodic debug output ---
   if (DEBUG_MODE) {
@@ -89,6 +93,4 @@ if (millis() - lastDash > 100) {
       last = millis();
     }
   }
-
-  delay(10);
 }

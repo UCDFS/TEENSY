@@ -1,3 +1,10 @@
+/**
+ * @file motor_controller.cpp
+ * @brief Manages Bamocar D3 inverter communications and torque control over CAN.
+ * @author Shane Whelan (UCD Formula Student)
+ * @date 2025/2026
+ */
+
 #include "motor_controller.h"
 #include "header.h"
 #include "brake_light.h"
@@ -71,8 +78,8 @@ static void readCAN() {
 static bool brakeActive() {
   // Use your existing brake output as the gate
   // If HIGH drives the lamp, treat HIGH as pressed
-  pinMode(BRAKE_LIGHT_PIN, INPUT); // ensure not driving it here
-  return digitalRead(BRAKE_LIGHT_PIN) == HIGH;
+  pinMode(BrakeLight::BRAKE_LIGHT_PIN, INPUT); // ensure not driving it here
+  return digitalRead(BrakeLight::BRAKE_LIGHT_PIN) == HIGH;
 }
 
 static bool rtdButtonPressed() {
