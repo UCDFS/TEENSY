@@ -16,6 +16,10 @@
 // --- Globals ---
 static bool torqueCutActive = false;
 
+// Slew state for torque limiting
+static int16_t g_lastTorqueCmd = 0;
+static uint32_t g_lastTorqueTs = 0;
+
 void setup() {
   Serial.begin(115200);
   delay(300);
@@ -37,9 +41,9 @@ void loop() {
 
   // --- Safety: APPS + Brake conflict (FSUK T11.8.10) ---
   static uint32_t brakeStart = 0;
-  if (brake.brake_active && apps.value >= 25.0) {
+  if (brake.brake_active && apps.value >= APPS::APPS_BRAKE_CONFLICT_THRESHOLD) {
     if (brakeStart == 0) brakeStart = millis();
-    if (millis() - brakeStart > 500) torqueCutActive = true;
+    if (millis() - brakeStart > APPS::BRAKE_PLAUSIBILITY_TIMEOUT_MS) torqueCutActive = true;
   } else {
     brakeStart = 0;
     torqueCutActive = false;
@@ -48,14 +52,67 @@ void loop() {
   // --- Motor controller update ---
   MotorController::update();
 
-  // --- Torque command with safety redundancy ---
-  constexpr int16_t kMaxTorqueCounts = 32767; // full-scale Bamocar torque command
-  constexpr float   kMaxTorquePercent = 100.0f;
+  // --- Torque command with safety + speed limiter ---
+  constexpr int16_t kMaxTorqueCounts = MotorController::MAX_TORQUE_COUNTS;
+  constexpr float   kMaxTorquePercent = MotorController::MAX_TORQUE_PERCENT;
 
   int16_t torqueCounts = 0;
   if (MotorController::ready() && !MotorController::faulted() && !torqueCutActive) {
+    // Base torque from APPS
     float clampedPercent = constrain(apps.value, 0.0f, kMaxTorquePercent);
-    torqueCounts = static_cast<int16_t>(kMaxTorqueCounts * (clampedPercent / kMaxTorquePercent));
+
+    // Compute speed and limiter scalar
+    const int rpmNow = MotorController::rpm();
+    const float speedKmh = Helper::rpm_to_kmh(rpmNow);
+
+    float limiter = 1.0f;
+    const float limit = SPEED_LIMIT_KMH;
+    const float taper = SPEED_LIMIT_TAPER_KMH;
+
+    // Hysteresis for the hard cap region
+    static bool speedCapActive = false;
+    if (!speedCapActive) {
+      if (speedKmh >= limit) speedCapActive = true;
+    } else {
+      if (speedKmh <= (limit - SPEED_LIMIT_HYST_KMH)) speedCapActive = false;
+    }
+
+    if (speedCapActive) {
+      limiter = 0.0f; // hold zero torque until we are below limit - hysteresis
+    } else if (speedKmh >= (limit - taper)) {
+      // Linear taper as we approach the limit from below
+      const float within = speedKmh - (limit - taper);
+      limiter = constrain(1.0f - (within / taper), 0.0f, 1.0f);
+    }
+
+    float limitedPercent = clampedPercent * limiter;
+
+    // Convert to counts
+    int16_t desiredCounts = static_cast<int16_t>(kMaxTorqueCounts * (limitedPercent / kMaxTorquePercent));
+
+    // Slew-rate limit to avoid jerk (except when forcing to zero)
+    const uint32_t now = millis();
+    if (g_lastTorqueTs == 0) g_lastTorqueTs = now;
+    const uint32_t dtMs = now - g_lastTorqueTs;
+
+    if (desiredCounts == 0 || desiredCounts < g_lastTorqueCmd) {
+      // Allow instant reduction towards zero for safety/limit compliance
+      torqueCounts = desiredCounts;
+    } else {
+      // Limit positive rise rate
+      const int32_t maxStep = (int32_t)SPEED_SLEW_COUNTS_PER_SEC * (int32_t)dtMs / 1000;
+      const int32_t step = desiredCounts - g_lastTorqueCmd;
+      if (step > maxStep) torqueCounts = g_lastTorqueCmd + (int16_t)maxStep;
+      else torqueCounts = desiredCounts;
+    }
+
+    g_lastTorqueCmd = torqueCounts;
+    g_lastTorqueTs = now;
+  } else {
+    // Not ready/fault/cut — ensure zero and reset slew baseline
+    torqueCounts = 0;
+    g_lastTorqueCmd = 0;
+    g_lastTorqueTs = millis();
   }
 
   // Always explicitly send the command — ensures inverter sees zero on faults
@@ -63,7 +120,7 @@ void loop() {
 
   // --- Dashboard update ---
   static uint32_t lastDash = 0;
-  if (millis() - lastDash > 100) {
+  if (millis() - lastDash > DASHBOARD_UPDATE_INTERVAL_MS) {
     float speedKmh = Helper::rpm_to_kmh(MotorController::rpm());
 
     Dashboard::updateTelemetry(speedKmh,
@@ -83,7 +140,7 @@ void loop() {
   // --- Periodic debug output ---
   if (DEBUG_MODE) {
     static uint32_t last = 0;
-    if (millis() - last > 1000) {
+    if (millis() - last > DEBUG_PRINT_INTERVAL_MS) {
       Serial.print("APPS: ");
       Serial.print(apps.value, 1);
       Serial.print("% | Brake: ");

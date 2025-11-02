@@ -12,6 +12,10 @@ namespace MotorController {
 
 inline constexpr int DEBUG_MODE = 1; // 0 disables module logging
 
+// Bamocar torque scaling
+inline constexpr int16_t MAX_TORQUE_COUNTS  = 32767; // full-scale command
+inline constexpr float   MAX_TORQUE_PERCENT = 100.0f;
+
 // Init pins and CAN. rtdButtonPin is active-low. buzzerPin optional (-1 to disable)
 void init();
 

@@ -84,6 +84,7 @@ constexpr int APPS2_RAW_MAX = 750; // Value when pedal is released (0%)
 
 // APPS
 constexpr float APPS_PLAUSIBILITY_THRESHOLD = 10.0f; // T11.8.9
+constexpr float APPS_BRAKE_CONFLICT_THRESHOLD = 25.0f; // percent threshold for brake conflict logic
 
 const unsigned long PLAUSIBILITY_TIMEOUT_MS =
     100; // Max time for APPS implausibility (Rule EV.5.6.3)
