@@ -25,7 +25,7 @@ constexpr unsigned int RPM_REQ_INTERVAL_MS    = 20;
 
 // ====== SPEED LIMITER ======
 // Top speed limit in km/h and taper band where torque linearly reduces to 0
-constexpr float SPEED_LIMIT_KMH         = 50.0f; // adjust as needed
+constexpr float SPEED_LIMIT_KMH         = 20.0f; // adjust as needed
 constexpr float SPEED_LIMIT_TAPER_KMH   = 3.0f;  // linear taper band below limit
 constexpr float SPEED_LIMIT_HYST_KMH    = 0.5f;  // optional hysteresis for re-enable
 // Slew rate to avoid jerky torque changes when limiting (counts per second)
