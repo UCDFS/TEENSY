@@ -21,10 +21,12 @@
  */
 
 /** 
- * Define DEBUG_SERIAL_ENABLE to enable debug serial. 
- * Comment it to disable debug serial. 
+ * Define DEBUG_SERIAL_ENABLE to enable debug serial. Comment it to disable
+ * debug serial. The library ships with this enabled which drives `Serial`
+ * with debug output and can block the main loop if the host is not reading
+ * the USB serial. Disable it here to avoid Serial blocking in production.
  */
-#define DEBUG_SERIAL_ENABLE
+/* #define DEBUG_SERIAL_ENABLE */
 
 /**
  * Define dbSerial for the output of debug messages. 

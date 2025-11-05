@@ -194,9 +194,11 @@ bool nexInit(void)
 {
     bool ret1 = false;
     bool ret2 = false;
-    
-    dbSerialBegin(9600);
-    nexSerial.begin(9600);
+    // NOTE: Do not reconfigure serial baud here. The application should set
+    // the desired baud on the chosen HardwareSerial (e.g. Serial1) before
+    // calling nexInit(). Changing the baud here caused conflicts where the
+    // application set 115200 but the library reset to 9600, leading to
+    // communication stalls and blocking behavior.
     sendCommand("");
     sendCommand("bkcmd=1");
     ret1 = recvRetCommandFinished();
@@ -214,7 +216,10 @@ void nexLoop(NexTouch *nex_listen_list[])
     
     while (nexSerial.available() > 0)
     {   
-        delay(10);
+        // Yield briefly instead of delaying to avoid blocking the CPU for a
+        // fixed 10ms while processing incoming Nextion bytes. This lets other
+        // background tasks run and avoids long sleeps that cause choppiness.
+        yield();
         c = nexSerial.read();
         
         if (NEX_RET_EVENT_TOUCH_HEAD == c)

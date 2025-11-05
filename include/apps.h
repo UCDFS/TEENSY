@@ -70,6 +70,16 @@ extern const double PEDAL_MAX;
 constexpr int APPS_1_PIN = A6;
 constexpr int APPS_2_PIN = A7;
 
+// Small deadzone (in raw ADC counts) around the released and fully-pressed
+// positions to prevent small noise from producing a non-zero percent value.
+// This snaps values very near the extremes to exact 0% / 100%.
+constexpr int APPS_RAW_DEADZONE = 8; // counts
+
+// Allow a small tolerance when checking raw integrity so very short noise
+// spikes just outside the calibrated min/max don't immediately classify as a
+// fault. This is only a small margin and shouldn't hide real wiring faults.
+constexpr int APPS_RAW_TOLERANCE = 8; // counts
+
 // How many MS since an implausibility was detecting
 inline int implausibility_start = 0;
 
@@ -78,7 +88,7 @@ inline int implausibility_start = 0;
 // These are RAW ADC values (not voltages), since values DECREASE when
 // pressed
 constexpr int APPS1_RAW_MIN = 473; // Value when pedal is fully pressed (100%)
-constexpr int APPS1_RAW_MAX = 750; // Value when pedal is released (0%)
+constexpr int APPS1_RAW_MAX = 765; // Value when pedal is released (0%)
 constexpr int APPS2_RAW_MIN = 468; // Value when pedal is fully pressed (100%)
 constexpr int APPS2_RAW_MAX = 750; // Value when pedal is released (0%)
 

@@ -23,14 +23,34 @@ get_percentage_values(std::pair<float, float> raws) {
 
   // Convert raw ADC values directly to percentage (0-100) - INVERTED values
   // Note: values decrease as pedal is pressed, so we invert the calculation
-  double apps_1_percent =
-      100.0 * (APPS1_RAW_MAX - raws.first) / (APPS1_RAW_MAX - APPS1_RAW_MIN);
-  double apps_2_percent =
-      100.0 * (APPS2_RAW_MAX - raws.second) / (APPS2_RAW_MAX - APPS2_RAW_MIN);
 
-  // Clamp values to 0-100 range
-  apps_1_percent = constrain(apps_1_percent, 0.0, 100.0);
-  apps_2_percent = constrain(apps_2_percent, 0.0, 100.0);
+  // Implement a small deadzone at the top (released) and bottom (fully
+  // pressed) so small noise does not produce a non-zero percent. We snap to
+  // exact 0% or 100% when within APPS_RAW_DEADZONE counts of the extreme.
+
+  float apps_1_percent;
+  if (raws.first >= (APPS1_RAW_MAX - APPS_RAW_DEADZONE)) {
+    apps_1_percent = 0.0f;
+  } else if (raws.first <= (APPS1_RAW_MIN + APPS_RAW_DEADZONE)) {
+    apps_1_percent = 100.0f;
+  } else {
+    apps_1_percent = 100.0f * (APPS1_RAW_MAX - raws.first) /
+                     (APPS1_RAW_MAX - APPS1_RAW_MIN);
+  }
+
+  float apps_2_percent;
+  if (raws.second >= (APPS2_RAW_MAX - APPS_RAW_DEADZONE)) {
+    apps_2_percent = 0.0f;
+  } else if (raws.second <= (APPS2_RAW_MIN + APPS_RAW_DEADZONE)) {
+    apps_2_percent = 100.0f;
+  } else {
+    apps_2_percent = 100.0f * (APPS2_RAW_MAX - raws.second) /
+                     (APPS2_RAW_MAX - APPS2_RAW_MIN);
+  }
+
+  // Clamp values to 0-100 range as a safety net
+  apps_1_percent = constrain(apps_1_percent, 0.0f, 100.0f);
+  apps_2_percent = constrain(apps_2_percent, 0.0f, 100.0f);
 
   return {apps_1_percent, apps_2_percent};
 }
@@ -56,8 +76,16 @@ bool check_plausiblity(std::pair<float, float> percentages) {
 bool check_integrity(std::pair<float, float> raws) {
 
   // Verify electrical plausiblity as per T11.9.2
-  if (raws.first > APPS1_RAW_MAX || raws.first < APPS1_RAW_MIN ||
-      raws.second > APPS2_RAW_MAX || raws.second < APPS2_RAW_MIN) {
+  // Allow a small tolerance on the raw min/max to avoid classifying tiny
+  // transients or ADC noise as a wiring fault. If values are outside this
+  // expanded window then treat as Fault.
+  const int apps1_min_allowed = APPS1_RAW_MIN - APPS_RAW_TOLERANCE;
+  const int apps1_max_allowed = APPS1_RAW_MAX + APPS_RAW_TOLERANCE;
+  const int apps2_min_allowed = APPS2_RAW_MIN - APPS_RAW_TOLERANCE;
+  const int apps2_max_allowed = APPS2_RAW_MAX + APPS_RAW_TOLERANCE;
+
+  if (raws.first > apps1_max_allowed || raws.first < apps1_min_allowed ||
+      raws.second > apps2_max_allowed || raws.second < apps2_min_allowed) {
     if (DEBUG_MODE) {
       Serial.print("APP Output Exceeds Limits!");
       Serial.print("APPS1 Raw: ");

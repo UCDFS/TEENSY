@@ -9,7 +9,7 @@
 #include <Arduino.h>
 
 // ====== GLOBAL FLAGS ======
-constexpr bool DEBUG_MODE = true;          // Enable Serial debug output
+constexpr bool DEBUG_MODE = false;          // Enable Serial debug output
 
 // ====== PIN ASSIGNMENTS ======
 constexpr int RTD_BUTTON_PIN  = 22;  // Momentary Ready-to-Drive button
@@ -32,5 +32,5 @@ constexpr float SPEED_LIMIT_HYST_KMH    = 0.5f;  // optional hysteresis for re-e
 constexpr int   SPEED_SLEW_COUNTS_PER_SEC = 8000; // adjust to taste
 
 // ====== UI / DEBUG ======
-constexpr unsigned int DASHBOARD_UPDATE_INTERVAL_MS = 100;  // Nextion refresh cadence
+constexpr unsigned int DASHBOARD_UPDATE_INTERVAL_MS = 100;  // ms
 constexpr unsigned int DEBUG_PRINT_INTERVAL_MS      = 1000; // Serial debug cadence
