@@ -8,6 +8,7 @@
 #include "dashboard.h"
 #include "nextion_ids.h"
 #include "dashboard_helpers.h"
+#include "nextion_colors.h"
 
 // ---------- Page 2 – Driving Info ----------
 static NexPage pageTelemetry(PAGE_TELEMETRY, 0, "page2");
@@ -63,6 +64,21 @@ void updateAcceleratorBar(float accelPercent) {
 
 void updateBrakeLightBar(bool brakeActive) {
   setBar(brakeLight, brakeActive ? 100 : 0);
+}
+
+void setSpeedLimited(bool limited) {
+  // Backwards compat: limited=true -> Capped (Blue), false -> Normal (White)
+  setSpeedLimitState(limited ? SpeedLimitState::Capped : SpeedLimitState::Normal);
+}
+
+void setSpeedLimitState(SpeedLimitState state) {
+  uint16_t color = NextionColors::White;
+  switch (state) {
+    case SpeedLimitState::Normal:   color = NextionColors::UCD_Pink;   break;
+    case SpeedLimitState::Tapering: color = NextionColors::Yellow;  break; // beginning to taper
+    case SpeedLimitState::Capped:   color = NextionColors::Cyan;    break; // at/over limit
+  }
+  tSpeed.Set_font_color_pco(color);
 }
 
 } // namespace Dashboard

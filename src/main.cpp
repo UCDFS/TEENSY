@@ -38,6 +38,7 @@ void loop() {
   // --- Sensor updates ---
   BrakeLight::BrakeData brake = BrakeLight::update();
   auto apps  = APPS::get_apps_reading();
+  Dashboard::SpeedLimitState limitState = Dashboard::SpeedLimitState::Normal;
 
   // --- Safety: APPS + Brake conflict (FSUK T11.8.10) ---
   static uint32_t brakeStart = 0;
@@ -86,6 +87,14 @@ void loop() {
     }
 
     float limitedPercent = clampedPercent * limiter;
+    // Determine limit state for UI coloring
+    if (speedCapActive) {
+      limitState = Dashboard::SpeedLimitState::Capped;
+    } else if (limiter < 0.999f) {
+      limitState = Dashboard::SpeedLimitState::Tapering;
+    } else {
+      limitState = Dashboard::SpeedLimitState::Normal;
+    }
 
     // Convert to counts
     int16_t desiredCounts = static_cast<int16_t>(kMaxTorqueCounts * (limitedPercent / kMaxTorquePercent));
@@ -113,6 +122,7 @@ void loop() {
     torqueCounts = 0;
     g_lastTorqueCmd = 0;
     g_lastTorqueTs = millis();
+    limitState = Dashboard::SpeedLimitState::Normal;
   }
 
   // Always explicitly send the command — ensures inverter sees zero on faults
@@ -134,6 +144,7 @@ void loop() {
 
     Dashboard::updateAcceleratorBar(apps.value);
     Dashboard::updateBrakeLightBar(brake.brake_active);
+    Dashboard::setSpeedLimitState(limitState);
     lastDash = millis();
   }
 
