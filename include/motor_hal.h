@@ -61,9 +61,4 @@ public:
 
 private:
 };
-
-MotorHAL::MotorHAL() {}
-
-MotorHAL::~MotorHAL() {}
-
 #endif // INCLUDE_INCLUDE_MOTOR_HAL_H_
