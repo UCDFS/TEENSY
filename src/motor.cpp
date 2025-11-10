@@ -1,91 +1,233 @@
 #include "motor.h"
 #include "units.h"
 
-Motor::Motor() {
-  Serial.begin(USB_DEBUGGING_PORT); // USB debugging
-  Serial2.begin(ESP8266_PORT);      // ESP8266 link (TX2/RX2)
+// Static member definitions
+FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Motor::Can1;
+bool Motor::readyToDrive = false;
+bool Motor::faultActive = false;
+bool Motor::rtdRequestPending = false;
+uint32_t Motor::tPendingReady = 0;
+uint16_t Motor::statusWord = 0;
+int Motor::rpmFeedback = 0;
+float Motor::dcBusVoltage = 0.0f;
+int16_t Motor::lastTorque = 0;
+uint32_t Motor::tLastReissue = 0;
+uint32_t Motor::tBuzzerOff = 0;
 
-  Can1.begin();
-  Can1.setBaudRate(BAUDRATE);
-  analogReadResolution(12);
+/**
+ * @file motor_controller.cpp
+ * @brief Manages Bamocar D3 inverter communications and torque control over
+ * CAN.
+ * @author Shane Whelan (UCD Formula Student)
+ * @date 2025/2026
+ */
 
-  if (!SD.begin(chipSelect)) {
-    Serial.println("SD card init failed!");
-    while (1)
-      ;
+// #include "brake_light.h"
+// #include "header.h"
+#include "motor.h"
+#include <FlexCAN_T4.h>
+// ---------- helpers ----------
+inline void Motor::send3(uint8_t b0, uint8_t b1, uint8_t b2) {
+  CAN_message_t m{};
+  m.id = BAMOCAR_RX_ID;
+  m.len = 3;
+  m.buf[0] = b0;
+  m.buf[1] = b1;
+  m.buf[2] = b2;
+  Can1.write(m);
+
+  // Logging::logCANFrame(m, "TX");
+}
+
+static void handleStatusWord(uint16_t word) {
+  Motor::statusWord = word;
+  Motor::faultActive = (word & 0x0040) != 0;
+  const bool enableBit = (word & 0x0001) != 0;
+  const bool readyBit = (word & 0x0004) != 0;
+
+  if (Motor::faultActive) {
+    if (Motor::readyToDrive && MotorController::DEBUG_MODE)
+      Serial.println("Inverter fault. RTD cleared.");
+    Motor::readyToDrive = false;
+    if (Motor::rtdRequestPending && MotorController::DEBUG_MODE)
+      Serial.println("Pending RTD cancelled due to fault.");
+    Motor::rtdRequestPending = false;
+    Motor::tPendingReady = 0;
+    if (Motor::tBuzzerOff) {
+      if (BUZZER_PIN >= 0)
+        digitalWrite(BUZZER_PIN, LOW);
+      Motor::tBuzzerOff = 0;
+    }
+    return;
   }
 
-  String filename = generateFilename();
-  logFile = SD.open(filename.c_str(), FILE_WRITE);
-  if (!logFile) {
-    Serial.println("File open failed!");
-    while (1)
-      ;
+  if (enableBit && readyBit) {
+    if (!Motor::readyToDrive) {
+      Motor::readyToDrive = true;
+      Motor::rtdRequestPending = false;
+      Motor::tPendingReady = 0;
+      if (BUZZER_PIN >= 0) {
+        pinMode(BUZZER_PIN, OUTPUT);
+        digitalWrite(BUZZER_PIN, HIGH);
+        Motor::tBuzzerOff = millis() + 3000;
+      }
+      if (MotorController::DEBUG_MODE)
+        Serial.println("Inverter confirmed RTD.");
+    }
+  } else if (Motor::readyToDrive) {
+    Motor::readyToDrive = false;
+    Motor::tPendingReady = 0;
+    if (Motor::tBuzzerOff) {
+      if (BUZZER_PIN >= 0)
+        digitalWrite(BUZZER_PIN, LOW);
+      Motor::tBuzzerOff = 0;
+    }
+    if (MotorController::DEBUG_MODE)
+      Serial.println("Inverter exited RTD state.");
+  }
+}
+
+static void readCAN() {
+  CAN_message_t msg;
+  while (Can1.read(msg)) {
+    // Logging::logCANFrame(msg, "RX");
+    if (msg.id != BAMOCAR_TX_ID || msg.len < 3)
+      continue;
+    const uint8_t reg = msg.buf[0];
+
+    if (reg == 0x40) { // status word
+      const uint16_t word = uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8);
+      handleStatusWord(word);
+    } else if (reg == 0x30) { // rpm
+      rpmFeedback = int16_t(uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8));
+    } else if (reg == 0xEB) { // dc bus voltage 0.1 V/LSB
+      dcBusVoltage =
+          0.1f * float(uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8));
+    }
+  }
+}
+
+static bool brakeActive() { return BrakeLight::is_active(); }
+
+static bool rtdButtonPressed() {
+  pinMode(RTD_BUTTON_PIN, INPUT_PULLUP);
+  return digitalRead(RTD_BUTTON_PIN) == LOW; // active low
+}
+
+static void tryEnterRTD() {
+  static bool holding = false;
+  static uint32_t tStart = 0;
+
+  if (readyToDrive || faultActive || rtdRequestPending) {
+    holding = false;
+    return;
   }
 
-  logFile.println("Time(ms),Dir,ID,Len,B0,B1,B2,B3,B4,B5,B6,B7,Decoded");
-  logFile.flush();
-
-  Serial.println("=== BAMOCAR Headless Bring-Up ===");
-  Serial.print("Logging to: ");
-  Serial.println(filename);
-  Serial2.println("STATUS:INITIALISING");
-
-  // executeStep(1);
-
-  requestStatusCyclic(100);
-  requestSpeedCyclic(100);
-
-  Serial.println("Waiting for Bamocar to respond...");
-  while (!bamocarOnline) {
-    requestStatusOnce();
-    readCanMessages();
-    delay(300);
+  if (!brakeActive() || !rtdButtonPressed()) {
+    holding = false;
+    return;
   }
 
-  Serial.println("Bamocar online detected.");
-  Serial2.println("STATUS:ONLINE");
+  if (!holding) {
+    holding = true;
+    tStart = millis();
+  }
 
-  // executeStep(2);
+  if (millis() - tStart < 1000)
+    return;
 
-  requestDCBusOnce();
-  delay(200);
-
-  // executeStep(3);
   clearErrors();
-  delay(200);
-  // executeStep(4);
-  configureCanTimeout(CAN_TIMEOUT);
-  delay(200);
-  // executeStep(5);
-  clearErrors();
-  delay(100);
+  lockDrive();
+  delay(50);
   enableDrive();
-  requestStatusOnce();
 
-  delay(500);
-  // executeStep(6);
-  sendTorqueCommand(0);
-  delay(500);
+  rtdRequestPending = true;
+  tPendingReady = millis();
+  if (MotorController::DEBUG_MODE)
+    Serial.println("RTD enable request sent.");
 
-  Serial.println("Waiting for pedal release...");
-  int potValue = 0;
-  for (int i = 0; i < 10; i++) {
-    potValue += analogRead(A0);
-    delay(10);
+  holding = false;
+}
+
+// ---------- public API ----------
+namespace MotorController {
+
+void init() {}
+
+void update() {
+  Can1.events();
+  readCAN();
+
+  if (rtdRequestPending && (millis() - tPendingReady) > 2000) {
+    rtdRequestPending = false;
+    if (MotorController::DEBUG_MODE)
+      Serial.println("RTD enable request timed out.");
   }
 
-  potValue /= 10;
-  while ((2930 - potValue) * 100.0f / (2930 - 1860) > 5.0f) {
-    potValue = analogRead(A0);
-    delay(50);
+  // re-issue cyclic requests every few seconds for keep-alive robustness
+  if (millis() - tLastReissue > 5000) {
+    requestCyclic(0x40, STATUS_REQ_INTERVAL_MS);
+    requestCyclic(0x30, RPM_REQ_INTERVAL_MS);
+    tLastReissue = millis();
   }
-  Serial.println("Pedal released, continuing...");
 
-  // executeStep(7);
-  Serial.println("Torque control active (A0)");
-  Serial.printf("Max accel cap: %d%%\n", MAX_ACCEL_PERCENT);
-  Serial2.println("STATUS:TORQUE_CONTROL");
+  // buzzer off timer
+  if (tBuzzerOff && millis() >= tBuzzerOff) {
+    if (BUZZER_PIN >= 0)
+      digitalWrite(BUZZER_PIN, LOW);
+    tBuzzerOff = 0;
+  }
+
+  // manage RTD entry
+  if (!readyToDrive) {
+    tryEnterRTD();
+  }
+}
+
+void setTorque(int16_t torqueCounts) {
+  if (!readyToDrive || faultActive)
+    return;
+  if (torqueCounts != lastTorque) {
+    setTorqueRaw(torqueCounts);
+    lastTorque = torqueCounts;
+  }
+}
+
+bool ready() { return readyToDrive; }
+bool faulted() { return faultActive; }
+int rpm() { return rpmFeedback; }
+float dcBus() { return dcBusVoltage; }
+
+} // namespace MotorController
+
+Motor::Motor() {
+  if (MotorController::DEBUG_MODE)
+    Serial.println("Motor Controller init");
+
+  pinMode(RTD_BUTTON_PIN, INPUT_PULLUP);
+  if (BUZZER_PIN >= 0) {
+    pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, LOW);
+  }
+
+  // CAN
+  Can1.begin();
+  Can1.setBaudRate(CAN_BAUD_RATE);
+  delay(50);
+  Serial.println("CAN bus initialized");
+
+  clearErrors();
+  setCanTimeout(CAN_TIMEOUT_MS);
+  delay(50);
+  Serial.println("Cleared errors and set CAN timeout");
+
+  // set cyclic requests
+  requestCyclic(ADDRS::STATUS, STATUS_REQ_INTERVAL_MS); // status
+  requestCyclic(ADDRS::RPM, RPM_REQ_INTERVAL_MS);       // rpm
+  // one shot dc bus
+  request_once(ADDRS::READ_DC);
+
+  tLastReissue = millis();
 }
 
 Motor::MotorResponse Motor::set_torque(units::torque::newton_meter_t desired) {
@@ -98,15 +240,7 @@ Motor::MotorResponse Motor::set_torque(units::torque::newton_meter_t desired) {
   this->sendTorqueCommand(desired.value());
 }
 
-void Motor::transmit(int function, int val, int val2 /*= 0x00*/) {
-  CAN_message_t msg = {0};
-  msg.id = BAMOCAR_RX_ID;
-  msg.len = 3;
-  msg.buf[0] = function;
-  msg.buf[1] = val;
-  msg.buf[2] = val2;
-  sendCAN(msg);
+void Motor::set(int function, int val) {
+  send3(function, val & 0xFF, (val >> 8) & 0xFF);
 }
-
-void Motor::set(int function, int val);
-void Motor::request(int field);
+void Motor::request_once(int field) { send3(ADDRS::READ, field, 0x00); }
