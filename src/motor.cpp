@@ -39,17 +39,17 @@ inline void Motor::send3(uint8_t b0, uint8_t b1, uint8_t b2) {
   // Logging::logCANFrame(m, "TX");
 }
 
-static void handleStatusWord(uint16_t word) {
+void Motor::handleStatusWord(uint16_t word) {
   Motor::statusWord = word;
   Motor::faultActive = (word & 0x0040) != 0;
   const bool enableBit = (word & 0x0001) != 0;
   const bool readyBit = (word & 0x0004) != 0;
 
   if (Motor::faultActive) {
-    if (Motor::readyToDrive && MotorController::DEBUG_MODE)
+    if (Motor::readyToDrive && DEBUG_MODE)
       Serial.println("Inverter fault. RTD cleared.");
     Motor::readyToDrive = false;
-    if (Motor::rtdRequestPending && MotorController::DEBUG_MODE)
+    if (Motor::rtdRequestPending && DEBUG_MODE)
       Serial.println("Pending RTD cancelled due to fault.");
     Motor::rtdRequestPending = false;
     Motor::tPendingReady = 0;
@@ -71,7 +71,7 @@ static void handleStatusWord(uint16_t word) {
         digitalWrite(BUZZER_PIN, HIGH);
         Motor::tBuzzerOff = millis() + 3000;
       }
-      if (MotorController::DEBUG_MODE)
+      if (DEBUG_MODE)
         Serial.println("Inverter confirmed RTD.");
     }
   } else if (Motor::readyToDrive) {
@@ -82,12 +82,12 @@ static void handleStatusWord(uint16_t word) {
         digitalWrite(BUZZER_PIN, LOW);
       Motor::tBuzzerOff = 0;
     }
-    if (MotorController::DEBUG_MODE)
+    if (DEBUG_MODE)
       Serial.println("Inverter exited RTD state.");
   }
 }
 
-static void readCAN() {
+void Motor::readCAN() {
   CAN_message_t msg;
   while (Can1.read(msg)) {
     // Logging::logCANFrame(msg, "RX");
@@ -97,7 +97,7 @@ static void readCAN() {
 
     if (reg == 0x40) { // status word
       const uint16_t word = uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8);
-      handleStatusWord(word);
+      this->handleStatusWord(word);
     } else if (reg == 0x30) { // rpm
       rpmFeedback = int16_t(uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8));
     } else if (reg == 0xEB) { // dc bus voltage 0.1 V/LSB
@@ -107,14 +107,14 @@ static void readCAN() {
   }
 }
 
-static bool brakeActive() { return BrakeLight::is_active(); }
+// static bool brakeActive() { return BrakeLight::is_active(); }
 
-static bool rtdButtonPressed() {
+bool Motor::rtdButtonPressed() {
   pinMode(RTD_BUTTON_PIN, INPUT_PULLUP);
   return digitalRead(RTD_BUTTON_PIN) == LOW; // active low
 }
 
-static void tryEnterRTD() {
+void Motor::tryEnterRTD() {
   static bool holding = false;
   static uint32_t tStart = 0;
 
@@ -143,7 +143,7 @@ static void tryEnterRTD() {
 
   rtdRequestPending = true;
   tPendingReady = millis();
-  if (MotorController::DEBUG_MODE)
+  if (DEBUG_MODE)
     Serial.println("RTD enable request sent.");
 
   holding = false;
@@ -154,13 +154,13 @@ namespace MotorController {
 
 void init() {}
 
-void update() {
+void Motor::update() {
   Can1.events();
   readCAN();
 
   if (rtdRequestPending && (millis() - tPendingReady) > 2000) {
     rtdRequestPending = false;
-    if (MotorController::DEBUG_MODE)
+    if (DEBUG_MODE)
       Serial.println("RTD enable request timed out.");
   }
 
@@ -201,7 +201,7 @@ float dcBus() { return dcBusVoltage; }
 } // namespace MotorController
 
 Motor::Motor() {
-  if (MotorController::DEBUG_MODE)
+  if (DEBUG_MODE)
     Serial.println("Motor Controller init");
 
   pinMode(RTD_BUTTON_PIN, INPUT_PULLUP);

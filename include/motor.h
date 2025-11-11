@@ -16,25 +16,44 @@ public:
   Motor &operator=(const Motor &) = default;
   ~Motor();
   MotorResponse set_torque(units::torque::newton_meter_t desired);
-  static inline void requestCyclic(uint8_t reg, uint8_t periodMs) {
+  inline void requestCyclic(uint8_t reg, uint8_t periodMs) {
     send3(ADDRS::READ, reg, periodMs);
   }
-  static inline void setCanTimeout(uint16_t ms);
-  static inline void clearErrors();
-  static inline void lockDrive();
-  static inline void enableDrive();
-  static inline void setTorqueRaw(int16_t tq);
+  inline void setCanTimeout(uint16_t ms);
+  inline void clearErrors();
+  inline void lockDrive();
+  inline void enableDrive();
+  inline void setTorqueRaw(int16_t tq);
+  void update();
+
+  // ---------- State ----------
+  static bool readyToDrive;
+  static bool faultActive;
+  static bool rtdRequestPending;
+  static uint32_t tPendingReady;
+  static uint16_t statusWord;
+  static int rpmFeedback;
+  static float dcBusVoltage;
+  static int16_t lastTorque;
+
+  // timers
+  static uint32_t tLastReissue;
+  static uint32_t tBuzzerOff;
 
 private:
+  static constexpr int BUZZER_PIN = 0; // CHANGEME
+
   // CHANGEME
   static constexpr units::torque::newton_meter_t MAX_TORQUE =
       units::torque::newton_meter_t{0};
 
+  void readCAN();
   void transmit(int function, int val, int val2 = 0x00);
 
-  static inline void send3(uint8_t b0, uint8_t b1, uint8_t b2);
+  inline void send3(uint8_t b0, uint8_t b1, uint8_t b2);
   void set(int function, int val);
   void request_once(int field);
+  void tryEnterRTD();
 
   struct ADDRS {
     static constexpr uint8_t CANCEL_ERRORS = 0x8E; // Cannot confirm in docs
@@ -63,22 +82,9 @@ private:
   constexpr uint32_t BAMOCAR_TX_ID = 0x181; // inverter -> us
   constexpr uint32_t BAMOCAR_RX_ID = 0x201; // us -> inverter
 
-public:
-  // ---------- State ----------
-  static bool readyToDrive;
-  static bool faultActive;
-  static bool rtdRequestPending;
-  static uint32_t tPendingReady;
-  static uint16_t statusWord;
-  static int rpmFeedback;
-  static float dcBusVoltage;
-  static int16_t lastTorque;
+  void handleStatusWord(uint16_t word);
+  static constexpr bool DEBUG_MODE = true;
 
-  // timers
-  static uint32_t tLastReissue;
-  static uint32_t tBuzzerOff;
-
-private:
-};
+  bool rtdButtonPressed();
 
 #endif // INCLUDE_INCLUDE_MOTOR_H_
