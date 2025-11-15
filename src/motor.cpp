@@ -2,7 +2,7 @@
 #include "units.h"
 
 // Static member definitions
-FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Motor::Can1;
+/* FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Motor::Can1;
 bool Motor::readyToDrive = false;
 bool Motor::faultActive = false;
 bool Motor::rtdRequestPending = false;
@@ -13,7 +13,7 @@ float Motor::dcBusVoltage = 0.0f;
 int16_t Motor::lastTorque = 0;
 uint32_t Motor::tLastReissue = 0;
 uint32_t Motor::tBuzzerOff = 0;
-
+*/
 /**
  * @file motor_controller.cpp
  * @brief Manages Bamocar D3 inverter communications and torque control over
@@ -150,7 +150,6 @@ void Motor::tryEnterRTD() {
 }
 
 // ---------- public API ----------
-namespace MotorController {
 
 void init() {}
 
@@ -184,23 +183,12 @@ void Motor::update() {
   }
 }
 
-void setTorque(int16_t torqueCounts) {
-  if (!readyToDrive || faultActive)
-    return;
-  if (torqueCounts != lastTorque) {
-    setTorqueRaw(torqueCounts);
-    lastTorque = torqueCounts;
-  }
-}
+bool ready() { return Motor::readyToDrive; }
+bool faulted() { return Motor::faultActive; }
+int rpm() { return Motor::rpmFeedback; }
+float dcBus() { return Motor::dcBusVoltage; }
 
-bool ready() { return readyToDrive; }
-bool faulted() { return faultActive; }
-int rpm() { return rpmFeedback; }
-float dcBus() { return dcBusVoltage; }
-
-} // namespace MotorController
-
-Motor::Motor() {
+Motor::Motor(bool (*brake_active)()) : brakeActive(brake_active) {
   if (DEBUG_MODE)
     Serial.println("Motor Controller init");
 
@@ -212,12 +200,12 @@ Motor::Motor() {
 
   // CAN
   Can1.begin();
-  Can1.setBaudRate(CAN_BAUD_RATE);
+  Can1.setBaudRate(BAUDRATE);
   delay(50);
   Serial.println("CAN bus initialized");
 
   clearErrors();
-  setCanTimeout(CAN_TIMEOUT_MS);
+  setCanTimeout(CAN_TIMEOUT);
   delay(50);
   Serial.println("Cleared errors and set CAN timeout");
 
@@ -231,13 +219,23 @@ Motor::Motor() {
 }
 
 Motor::MotorResponse Motor::set_torque(units::torque::newton_meter_t desired) {
+
   if (desired < units::torque::newton_meter_t{0}) {
     return MotorResponse::NEGATIVE_TORQUE;
   }
   if (desired > this->MAX_TORQUE) {
     return MotorResponse::OVERTORQUE;
   }
-  this->sendTorqueCommand(desired.value());
+  if (!readyToDrive) {
+    return MotorResponse::DISABLED;
+  }
+  if (faultActive) {
+    return MotorResponse::CAN_ERROR;
+  }
+  if (desired != lastTorque) {
+    setTorqueRaw(desired.value());
+    lastTorque = desired;
+  }
 }
 
 void Motor::set(int function, int val) {

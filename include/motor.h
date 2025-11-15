@@ -1,15 +1,20 @@
-
 #include "units.h"
+
 #ifndef INCLUDE_INCLUDE_MOTOR_H_
 #define INCLUDE_INCLUDE_MOTOR_H_
 /// This class should be used by the user directly
 
-#include "motor_hal.h"
 #include <FlexCAN_T4.h>
-class Motor : private MotorHAL {
+class Motor {
 public:
-  enum class MotorResponse { OK, NEGATIVE_TORQUE, OVERTORQUE, CAN_ERROR };
-  Motor();
+  enum class MotorResponse {
+    OK,
+    NEGATIVE_TORQUE,
+    OVERTORQUE,
+    CAN_ERROR,
+    DISABLED
+  };
+  explicit Motor(bool (*brake_active)());
   Motor(Motor &&) = default;
   Motor(const Motor &) = default;
   Motor &operator=(Motor &&) = default;
@@ -25,6 +30,7 @@ public:
   inline void enableDrive();
   inline void setTorqueRaw(int16_t tq);
   void update();
+  void setTorque(units::torque::Nm torqueCounts);
 
   // ---------- State ----------
   static bool readyToDrive;
@@ -34,7 +40,7 @@ public:
   static uint16_t statusWord;
   static int rpmFeedback;
   static float dcBusVoltage;
-  static int16_t lastTorque;
+  static units::torque::newton_meter_t lastTorque;
 
   // timers
   static uint32_t tLastReissue;
@@ -74,17 +80,23 @@ private:
   static constexpr int BAUDRATE = 500000;
   static constexpr int ANALOG_RESOLUTION = 12;
   static constexpr int CAN_TIMEOUT = 2000;
+  static constexpr int RTD_BUTTON_PIN = 0;         // CHANGEME
+  static constexpr int STATUS_REQ_INTERVAL_MS = 0; // CHANGEME
+  static constexpr int RPM_REQ_INTERVAL_MS = 0;    // CHANGEME
 
   // NOTE: These were orignialy static, but since there should only ever be a
   // single instance of Motor, this shouldn't be an issue.
   // ---------- CAN ----------
   static FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1;
-  constexpr uint32_t BAMOCAR_TX_ID = 0x181; // inverter -> us
-  constexpr uint32_t BAMOCAR_RX_ID = 0x201; // us -> inverter
+  static constexpr uint32_t BAMOCAR_TX_ID = 0x181; // inverter -> us
+  static constexpr uint32_t BAMOCAR_RX_ID = 0x201; // us -> inverter
 
   void handleStatusWord(uint16_t word);
   static constexpr bool DEBUG_MODE = true;
 
   bool rtdButtonPressed();
+
+  bool (*brakeActive)();
+};
 
 #endif // INCLUDE_INCLUDE_MOTOR_H_
