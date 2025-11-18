@@ -1,4 +1,6 @@
 #include "units.h"
+#include <cstdint>
+#include <optional>
 
 #ifndef INCLUDE_INCLUDE_MOTOR_H_
 #define INCLUDE_INCLUDE_MOTOR_H_
@@ -14,25 +16,30 @@ public:
     CAN_ERROR,
     DISABLED
   };
-  explicit Motor(bool (*brake_active)());
+  ///@argument brake_active A pointer to a variable representing if the brake
+  /// lights should be on. Should be upgraded periodicaly
+  Motor(bool *brake_active);
   Motor(Motor &&) = default;
   Motor(const Motor &) = default;
   Motor &operator=(Motor &&) = default;
   Motor &operator=(const Motor &) = default;
   ~Motor();
-  MotorResponse set_torque(units::torque::newton_meter_t desired);
-  inline void requestCyclic(uint8_t reg, uint8_t periodMs) {
-    send3(ADDRS::READ, reg, periodMs);
-  }
+  MotorResponse setTorque(units::torque::newton_meter_t desired);
+
   inline void setCanTimeout(uint16_t ms);
   inline void clearErrors();
   inline void lockDrive();
   inline void enableDrive();
-  inline void setTorqueRaw(int16_t tq);
   void update();
-  void setTorque(units::torque::Nm torqueCounts);
+
+  inline bool ready() { return readyToDrive; }
+  inline bool faulted() { return faultActive; }
+  inline int rpm() { return rpmFeedback; }
+  inline float dcBus() { return dcBusVoltage; }
 
   // ---------- State ----------
+private:
+  inline void setTorqueRaw(int16_t tq);
   static bool readyToDrive;
   static bool faultActive;
   static bool rtdRequestPending;
@@ -46,7 +53,9 @@ public:
   static uint32_t tLastReissue;
   static uint32_t tBuzzerOff;
 
-private:
+  inline void requestCyclic(uint8_t reg, uint8_t periodMs) {
+    send3(ADDRS::READ, reg, periodMs);
+  }
   static constexpr int BUZZER_PIN = 0; // CHANGEME
 
   // CHANGEME
@@ -58,8 +67,11 @@ private:
 
   inline void send3(uint8_t b0, uint8_t b1, uint8_t b2);
   void set(int function, int val);
-  void request_once(int field);
+  // uint16_t request_once(int field);
   void tryEnterRTD();
+  bool getStatusField(uint8_t field);
+  bool getError(uint8_t field);
+  bool getWarning(uint8_t field);
 
   struct ADDRS {
     static constexpr uint8_t CANCEL_ERRORS = 0x8E; // Cannot confirm in docs
@@ -71,6 +83,17 @@ private:
     static constexpr uint8_t STATUS = 0x40; // pg 133
     static constexpr uint8_t RPM = 0x30;    // pg 142
     static constexpr uint8_t LOCK_DRIVE = 0x04;
+    static constexpr uint8_t SPECIAL_SETTINGS = 0xDC;
+    static constexpr uint8_t LOCK_DRIVE_BIT = 21; // pg 151
+    static constexpr uint8_t WARNING_ERROR = 0x8F;
+
+    static constexpr uint8_t STATUS_ENABLED = 0;
+    static constexpr uint8_t STATUS_OK = 4;
+    static constexpr uint8_t STATUS_STANDSTILL = 9;
+    static constexpr uint8_t ERROR_CAN_TIMEOUT = 3;
+    static constexpr uint8_t ERROR_MOTOR_OVERHEAT = 6;
+    static constexpr uint8_t ERROR_ENDSTAGE_OVERHEAT = 7;
+
   }; // struct ADDRS
 
   String generateFilename();
@@ -96,7 +119,9 @@ private:
 
   bool rtdButtonPressed();
 
-  bool (*brakeActive)();
+  std::optional<bool> getFromBitfield(uint16_t bitfieldAddr, uint8_t bit);
+
+  bool *brake_active;
 };
 
 #endif // INCLUDE_INCLUDE_MOTOR_H_

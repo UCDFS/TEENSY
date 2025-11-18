@@ -1,4 +1,5 @@
 #include "motor.h"
+#include "WProgram.h"
 #include "units.h"
 
 // Static member definitions
@@ -26,6 +27,7 @@ uint32_t Motor::tBuzzerOff = 0;
 // #include "header.h"
 #include "motor.h"
 #include <FlexCAN_T4.h>
+#include <cstdint>
 // ---------- helpers ----------
 inline void Motor::send3(uint8_t b0, uint8_t b1, uint8_t b2) {
   CAN_message_t m{};
@@ -39,52 +41,68 @@ inline void Motor::send3(uint8_t b0, uint8_t b1, uint8_t b2) {
   // Logging::logCANFrame(m, "TX");
 }
 
+// TODO ask Shane about how this works and how "word" is derived and defined
 void Motor::handleStatusWord(uint16_t word) {
-  Motor::statusWord = word;
-  Motor::faultActive = (word & 0x0040) != 0;
+  statusWord = word;
+  faultActive = (word & 0x0040) != 0;
   const bool enableBit = (word & 0x0001) != 0;
   const bool readyBit = (word & 0x0004) != 0;
 
-  if (Motor::faultActive) {
-    if (Motor::readyToDrive && DEBUG_MODE)
+  if (faultActive) {
+    if (readyToDrive && DEBUG_MODE)
       Serial.println("Inverter fault. RTD cleared.");
-    Motor::readyToDrive = false;
-    if (Motor::rtdRequestPending && DEBUG_MODE)
+    readyToDrive = false;
+    if (rtdRequestPending && DEBUG_MODE)
       Serial.println("Pending RTD cancelled due to fault.");
-    Motor::rtdRequestPending = false;
-    Motor::tPendingReady = 0;
-    if (Motor::tBuzzerOff) {
+    rtdRequestPending = false;
+    tPendingReady = 0;
+    if (tBuzzerOff) {
       if (BUZZER_PIN >= 0)
         digitalWrite(BUZZER_PIN, LOW);
-      Motor::tBuzzerOff = 0;
+      tBuzzerOff = 0;
     }
     return;
   }
 
   if (enableBit && readyBit) {
-    if (!Motor::readyToDrive) {
-      Motor::readyToDrive = true;
-      Motor::rtdRequestPending = false;
-      Motor::tPendingReady = 0;
+    if (!readyToDrive) {
+      readyToDrive = true;
+      rtdRequestPending = false;
+      tPendingReady = 0;
       if (BUZZER_PIN >= 0) {
         pinMode(BUZZER_PIN, OUTPUT);
         digitalWrite(BUZZER_PIN, HIGH);
-        Motor::tBuzzerOff = millis() + 3000;
+        tBuzzerOff = millis() + 3000;
       }
       if (DEBUG_MODE)
         Serial.println("Inverter confirmed RTD.");
     }
-  } else if (Motor::readyToDrive) {
-    Motor::readyToDrive = false;
-    Motor::tPendingReady = 0;
-    if (Motor::tBuzzerOff) {
+  } else if (readyToDrive) {
+    readyToDrive = false;
+    tPendingReady = 0;
+    if (tBuzzerOff) {
       if (BUZZER_PIN >= 0)
         digitalWrite(BUZZER_PIN, LOW);
-      Motor::tBuzzerOff = 0;
+      tBuzzerOff = 0;
     }
     if (DEBUG_MODE)
       Serial.println("Inverter exited RTD state.");
   }
+}
+
+std::optional<bool> Motor::getFromBitfield(uint16_t bitfieldAddr, uint8_t bit) {
+
+  CAN_message_t msg;
+  while (Can1.read(msg)) {
+    if (msg.id != BAMOCAR_TX_ID || msg.len < 3)
+      continue;
+    const uint8_t reg = msg.buf[0];
+    if (reg == bitfieldAddr) {
+      const uint16_t word = uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8);
+      return std::optional<bool>{(word & bit) != 0};
+    }
+  }
+  return std::nullopt;
 }
 
 void Motor::readCAN() {
@@ -95,12 +113,12 @@ void Motor::readCAN() {
       continue;
     const uint8_t reg = msg.buf[0];
 
-    if (reg == 0x40) { // status word
+    if (reg == ADDRS::STATUS) { // status word
       const uint16_t word = uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8);
       this->handleStatusWord(word);
-    } else if (reg == 0x30) { // rpm
+    } else if (reg == ADDRS::RPM) { // rpm
       rpmFeedback = int16_t(uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8));
-    } else if (reg == 0xEB) { // dc bus voltage 0.1 V/LSB
+    } else if (reg == ADDRS::READ_DC) { // dc bus voltage 0.1 V/LSB
       dcBusVoltage =
           0.1f * float(uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8));
     }
@@ -123,7 +141,7 @@ void Motor::tryEnterRTD() {
     return;
   }
 
-  if (!brakeActive() || !rtdButtonPressed()) {
+  if (!brake_active || !rtdButtonPressed()) {
     holding = false;
     return;
   }
@@ -182,13 +200,8 @@ void Motor::update() {
     tryEnterRTD();
   }
 }
-
-bool ready() { return Motor::readyToDrive; }
-bool faulted() { return Motor::faultActive; }
-int rpm() { return Motor::rpmFeedback; }
-float dcBus() { return Motor::dcBusVoltage; }
-
-Motor::Motor(bool (*brake_active)()) : brakeActive(brake_active) {
+Motor::Motor(bool *brake_active) {
+  this->brake_active = brake_active;
   if (DEBUG_MODE)
     Serial.println("Motor Controller init");
 
@@ -213,12 +226,13 @@ Motor::Motor(bool (*brake_active)()) : brakeActive(brake_active) {
   requestCyclic(ADDRS::STATUS, STATUS_REQ_INTERVAL_MS); // status
   requestCyclic(ADDRS::RPM, RPM_REQ_INTERVAL_MS);       // rpm
   // one shot dc bus
-  request_once(ADDRS::READ_DC);
+  // request_once(ADDRS::READ_DC);
+  send3(ADDRS::READ, ADDRS::READ_DC, 0);
 
   tLastReissue = millis();
 }
 
-Motor::MotorResponse Motor::set_torque(units::torque::newton_meter_t desired) {
+Motor::MotorResponse Motor::setTorque(units::torque::newton_meter_t desired) {
 
   if (desired < units::torque::newton_meter_t{0}) {
     return MotorResponse::NEGATIVE_TORQUE;
@@ -241,4 +255,31 @@ Motor::MotorResponse Motor::set_torque(units::torque::newton_meter_t desired) {
 void Motor::set(int function, int val) {
   send3(function, val & 0xFF, (val >> 8) & 0xFF);
 }
-void Motor::request_once(int field) { send3(ADDRS::READ, field, 0x00); }
+
+// I don't know how to handle this right now, hence the comment
+/*uint16_t Motor::request_once(int field) {
+  send3(ADDRS::READ, field, 0x00);
+  CAN_message_t msg;
+
+  while (Can1.read(msg)) {
+    if (msg.id != BAMOCAR_TX_ID || msg.len < 3)
+      continue;
+    const uint8_t reg = msg.buf[0];
+    if (reg == field)
+  }
+}
+*/
+
+bool Motor::getWarning(uint8_t field) {
+  return getFromBitfield(ADDRS::WARNING_ERROR, field).value_or(false);
+}
+
+void Motor::clearErrors() {
+  // TODO: This needs testing. I don't know the behvior of the errors
+  set(ADDRS::CANCEL_ERRORS, 1);
+}
+
+void Motor::lockDrive() {
+  setTorque(units::torque::newton_meter_t{0});
+  // TODO Unclear as to how to set a bitmap
+}
