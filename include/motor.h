@@ -1,4 +1,3 @@
-#include "units.h"
 #include <cstdint>
 #include <optional>
 
@@ -24,7 +23,7 @@ public:
   Motor &operator=(Motor &&) = default;
   Motor &operator=(const Motor &) = default;
   ~Motor();
-  MotorResponse setTorque(units::torque::newton_meter_t desired);
+  MotorResponse setTorque(double desired_Nm);
 
   inline void setCanTimeout(uint16_t ms);
   inline void clearErrors();
@@ -47,7 +46,7 @@ private:
   static uint16_t statusWord;
   static int rpmFeedback;
   static float dcBusVoltage;
-  static units::torque::newton_meter_t lastTorque;
+  static double lastTorque;
 
   // timers
   static uint32_t tLastReissue;
@@ -59,8 +58,7 @@ private:
   static constexpr int BUZZER_PIN = 0; // CHANGEME
 
   // CHANGEME
-  static constexpr units::torque::newton_meter_t MAX_TORQUE =
-      units::torque::newton_meter_t{0};
+  static constexpr double MAX_TORQUE = 0.0;
 
   void readCAN();
   void transmit(int function, int val, int val2 = 0x00);

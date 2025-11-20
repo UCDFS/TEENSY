@@ -1,6 +1,5 @@
 #include "motor.h"
 #include "WProgram.h"
-#include "units.h"
 
 // Static member definitions
 /* FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Motor::Can1;
@@ -232,9 +231,9 @@ Motor::Motor(bool *brake_active) {
   tLastReissue = millis();
 }
 
-Motor::MotorResponse Motor::setTorque(units::torque::newton_meter_t desired) {
+Motor::MotorResponse Motor::setTorque(double desired) {
 
-  if (desired < units::torque::newton_meter_t{0}) {
+  if (desired < double{0}) {
     return MotorResponse::NEGATIVE_TORQUE;
   }
   if (desired > this->MAX_TORQUE) {
@@ -247,7 +246,7 @@ Motor::MotorResponse Motor::setTorque(units::torque::newton_meter_t desired) {
     return MotorResponse::CAN_ERROR;
   }
   if (desired != lastTorque) {
-    setTorqueRaw(desired.value());
+    setTorqueRaw(desired);
     lastTorque = desired;
   }
 }
@@ -280,6 +279,7 @@ void Motor::clearErrors() {
 }
 
 void Motor::lockDrive() {
-  setTorque(units::torque::newton_meter_t{0});
-  // TODO Unclear as to how to set a bitmap
+  setTorque(double{0});
+  // Set the lock drive bit in the control register
+  set(ADDRS::LOCK_DRIVE, 1 << ADDRS::LOCK_DRIVE_BIT);
 }
