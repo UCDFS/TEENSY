@@ -28,7 +28,7 @@ uint32_t Motor::tBuzzerOff = 0;
 #include <FlexCAN_T4.h>
 #include <cstdint>
 // ---------- helpers ----------
-inline void Motor::send3(uint8_t b0, uint8_t b1, uint8_t b2) {
+void Motor::send3(uint8_t b0, uint8_t b1, uint8_t b2) {
   CAN_message_t m{};
   m.id = BAMOCAR_RX_ID;
   m.len = 3;
@@ -98,6 +98,8 @@ std::optional<bool> Motor::getFromBitfield(uint16_t bitfieldAddr, uint8_t bit) {
     const uint8_t reg = msg.buf[0];
     if (reg == bitfieldAddr) {
       const uint16_t word = uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8);
+      // The bitshift is required to look at both a low and high message. Many
+      // bitfields are split into two groups, such as warnings and errors.
       return std::optional<bool>{(word & bit) != 0};
     }
   }
@@ -167,8 +169,6 @@ void Motor::tryEnterRTD() {
 }
 
 // ---------- public API ----------
-
-void init() {}
 
 void Motor::update() {
   Can1.events();
@@ -246,9 +246,11 @@ Motor::MotorResponse Motor::setTorque(double desired) {
     return MotorResponse::CAN_ERROR;
   }
   if (desired != lastTorque) {
-    setTorqueRaw(desired);
+    set(ADDRS::SETPOINT, desired);
     lastTorque = desired;
+    return MotorResponse::OK;
   }
+  return MotorResponse::OK;
 }
 
 void Motor::set(int function, int val) {
@@ -271,6 +273,17 @@ void Motor::set(int function, int val) {
 
 bool Motor::getWarning(uint8_t field) {
   return getFromBitfield(ADDRS::WARNING_ERROR, field).value_or(false);
+}
+
+void Motor::setCanTimeout(uint16_t ms) { set(ADDRS::TIMEOUT, ms); }
+
+void Motor::enableDrive() {
+  if (rtdRequestPending) {
+    return;
+  }
+  rtdRequestPending = true;
+  tryEnterRTD();
+  set(ADDRS::LOCK_DRIVE, 0);
 }
 
 void Motor::clearErrors() {

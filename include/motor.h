@@ -28,6 +28,8 @@ public:
   inline void setCanTimeout(uint16_t ms);
   inline void clearErrors();
   inline void lockDrive();
+  // Very similar to tryEnterRTD, but attempts to unlock the drive system as
+  // well
   inline void enableDrive();
   void update();
 
@@ -38,7 +40,6 @@ public:
 
   // ---------- State ----------
 private:
-  inline void setTorqueRaw(int16_t tq);
   static bool readyToDrive;
   static bool faultActive;
   static bool rtdRequestPending;
