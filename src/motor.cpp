@@ -28,17 +28,6 @@ uint32_t Motor::tBuzzerOff = 0;
 #include <FlexCAN_T4.h>
 #include <cstdint>
 // ---------- helpers ----------
-void Motor::send3(uint8_t b0, uint8_t b1, uint8_t b2) {
-  CAN_message_t m{};
-  m.id = BAMOCAR_RX_ID;
-  m.len = 3;
-  m.buf[0] = b0;
-  m.buf[1] = b1;
-  m.buf[2] = b2;
-  Can1.write(m);
-
-  // Logging::logCANFrame(m, "TX");
-}
 
 // TODO ask Shane about how this works and how "word" is derived and defined
 void Motor::handleStatusWord(uint16_t word) {
@@ -142,7 +131,7 @@ void Motor::tryEnterRTD() {
     return;
   }
 
-  if (!brake_active || !rtdButtonPressed()) {
+  if ((!brake_active || !*brake_active) || !rtdButtonPressed()) {
     holding = false;
     return;
   }

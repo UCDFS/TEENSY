@@ -1,3 +1,4 @@
+#include "main.h"
 #include "motor.h"
 #include <Arduino.h>
 
@@ -6,5 +7,6 @@ void setup() {
 }
 
 void loop() {
+  motor.update();
   // put your main code here, to run repeatedly:
 }

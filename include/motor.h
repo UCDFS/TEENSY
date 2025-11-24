@@ -22,7 +22,7 @@ public:
   Motor(const Motor &) = default;
   Motor &operator=(Motor &&) = default;
   Motor &operator=(const Motor &) = default;
-  ~Motor();
+  ~Motor() = default;
   MotorResponse setTorque(double desired_Nm);
 
   inline void setCanTimeout(uint16_t ms);
@@ -40,18 +40,18 @@ public:
 
   // ---------- State ----------
 private:
-  static bool readyToDrive;
-  static bool faultActive;
-  static bool rtdRequestPending;
-  static uint32_t tPendingReady;
-  static uint16_t statusWord;
-  static int rpmFeedback;
-  static float dcBusVoltage;
-  static double lastTorque;
-
-  // timers
-  static uint32_t tLastReissue;
-  static uint32_t tBuzzerOff;
+  //---
+  static inline bool readyToDrive = false;
+  static inline bool faultActive = false;
+  static inline bool rtdRequestPending = false;
+  static inline uint32_t tPendingReady = 0;
+  static inline uint16_t statusWord = 0;
+  static inline int rpmFeedback = 0;
+  static inline float dcBusVoltage = 0.0f;
+  static inline int16_t lastTorque = 0;
+  static inline uint32_t tLastReissue = 0;
+  static inline uint32_t tBuzzerOff = 0;
+  //---
 
   inline void requestCyclic(uint8_t reg, uint8_t periodMs) {
     send3(ADDRS::READ, reg, periodMs);
@@ -64,7 +64,17 @@ private:
   void readCAN();
   void transmit(int function, int val, int val2 = 0x00);
 
-  inline void send3(uint8_t b0, uint8_t b1, uint8_t b2);
+  inline void send3(uint8_t b0, uint8_t b1, uint8_t b2) {
+    CAN_message_t m{};
+    m.id = BAMOCAR_RX_ID;
+    m.len = 3;
+    m.buf[0] = b0;
+    m.buf[1] = b1;
+    m.buf[2] = b2;
+    Can1.write(m);
+
+    // Logging::logCANFrame(m, "TX");
+  }
   void set(int function, int val);
   // uint16_t request_once(int field);
   void tryEnterRTD();
@@ -109,7 +119,7 @@ private:
   // NOTE: These were orignialy static, but since there should only ever be a
   // single instance of Motor, this shouldn't be an issue.
   // ---------- CAN ----------
-  static FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1;
+  static inline FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1;
   static constexpr uint32_t BAMOCAR_TX_ID = 0x181; // inverter -> us
   static constexpr uint32_t BAMOCAR_RX_ID = 0x201; // us -> inverter
 
@@ -118,6 +128,7 @@ private:
 
   bool rtdButtonPressed();
 
+  // Currently risks blocking everything and starving the thread
   std::optional<bool> getFromBitfield(uint16_t bitfieldAddr, uint8_t bit);
 
   bool *brake_active;
