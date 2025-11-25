@@ -99,9 +99,44 @@ private:
     static constexpr uint8_t STATUS_ENABLED = 0;
     static constexpr uint8_t STATUS_OK = 4;
     static constexpr uint8_t STATUS_STANDSTILL = 9;
+
+    // Errors occupy the 0x8F low bitmask, whereas warning occupy the 0x8F high
+    // bitmask
+    //
+    // All avalible on page 148
+    static constexpr uint8_t ERROR_EPROM_READ = 0;
+    static constexpr uint8_t ERROR_HW_FAULT = 1;
+    static constexpr uint8_t ERROR_RFE_INPUT_MISSING = 2;
     static constexpr uint8_t ERROR_CAN_TIMEOUT = 3;
+    static constexpr uint8_t ERROR_FEEDBACK_SIGNAL = 4;
+    static constexpr uint8_t ERROR_MAINS_VOLTAGE_MIN = 5;
     static constexpr uint8_t ERROR_MOTOR_OVERHEAT = 6;
     static constexpr uint8_t ERROR_ENDSTAGE_OVERHEAT = 7;
+    static constexpr uint8_t ERROR_MAINS_VOLTAGE_MAX = 8;
+    static constexpr uint8_t ERROR_CRITICAL_AC_CURRENT = 9;
+    static constexpr uint8_t ERROR_RACE_AWAY = 10;
+    static constexpr uint8_t ERROR_ECODE_TIMEOUT = 11;
+    static constexpr uint8_t ERROR_WATCHDOG_RESET = 12;
+    static constexpr uint8_t ERROR_AC_CURRENT_OFFSET = 13;
+    static constexpr uint8_t ERROR_INTERNAL_HW_VOLTAGE = 14;
+    static constexpr uint8_t ERROR_BLEED_RESISTOR_OVERLOAD = 15;
+
+    static constexpr uint8_t WARNING_PARAMETER_CONFLICT = 16;
+    static constexpr uint8_t WARNING_SPECIAL_CPU_FAULT = 17;
+    static constexpr uint8_t WARNING_RFE_INPUT_MISSING = 18;
+    static constexpr uint8_t WARNING_AUX_VOLTAGE_MIN = 19;
+    static constexpr uint8_t WARNING_FEEDBACK_SIGNAL = 20;
+    static constexpr uint8_t WARNING_5 = 21;
+    static constexpr uint8_t WARNING_MOTOR_TEMP_LIMIT = 22;
+    static constexpr uint8_t WARNING_IGBT_TEMP_LIMIT = 23;
+    static constexpr uint8_t WARNING_VOUT_SATURATION_MAX = 24;
+    static constexpr uint8_t WARNING_9 = 25;
+    static constexpr uint8_t WARNING_SPEED_RESOLUTION_LIMIT = 26;
+    static constexpr uint8_t WARNING_CHECK_ECODE_ID = 27;
+    static constexpr uint8_t WARNING_TRIPZONE_GLITCH = 28;
+    static constexpr uint8_t WARNING_ADC_SEQUENCER = 29;
+    static constexpr uint8_t WARNING_ADC_MEASUREMENT = 30;
+    static constexpr uint8_t WARNING_BLEEDER_RESISTOR_LOAD = 31;
 
   }; // struct ADDRS
 
