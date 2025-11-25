@@ -16,7 +16,7 @@ public:
     DISABLED
   };
   ///@argument brake_active A pointer to a variable representing if the brake
-  /// lights should be on. Should be upgraded periodicaly
+  /// lights should be on. Should be updated periodicaly
   Motor(bool *brake_active);
   Motor(Motor &&) = default;
   Motor(const Motor &) = default;
@@ -61,7 +61,6 @@ private:
   // CHANGEME
   static constexpr double MAX_TORQUE = 0.0;
 
-  void readCAN();
   void transmit(int function, int val, int val2 = 0x00);
 
   inline void send3(uint8_t b0, uint8_t b1, uint8_t b2) {
@@ -151,14 +150,11 @@ private:
   static constexpr int STATUS_REQ_INTERVAL_MS = 0; // CHANGEME
   static constexpr int RPM_REQ_INTERVAL_MS = 0;    // CHANGEME
 
-  // NOTE: These were orignialy static, but since there should only ever be a
-  // single instance of Motor, this shouldn't be an issue.
   // ---------- CAN ----------
   static inline FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1;
   static constexpr uint32_t BAMOCAR_TX_ID = 0x181; // inverter -> us
   static constexpr uint32_t BAMOCAR_RX_ID = 0x201; // us -> inverter
 
-  void handleStatusWord(uint16_t word);
   static constexpr bool DEBUG_MODE = true;
 
   bool rtdButtonPressed();
@@ -167,6 +163,63 @@ private:
   std::optional<bool> getFromBitfield(uint16_t bitfieldAddr, uint8_t bit);
 
   bool *brake_active;
+
+  // Represents the state of a can.read() in a much more human-readable way
+  struct FullCANFrame {
+    uint16_t rawStatusWord;
+
+    int16_t rpmFeedback;
+    float dcBusVoltage;
+    bool warning_present;
+
+    struct ProcessedStatusWord {
+      bool enableBit;
+      bool readyBit;
+      bool faultActive;
+    } statusWord;
+    struct Warnings {
+      bool parameter_conflict;
+      bool special_cpu_fault;
+      bool rfe_input_missing;
+      bool aux_voltage_min;
+      bool feedback_signal;
+      bool warn_5;
+      bool motor_temp_limit;
+      bool igbt_temp_limit;
+      bool vout_saturation_max;
+      bool warn_9;
+      bool speed_resolution_limit;
+      bool check_ecode_id;
+      bool tripzone_glitch;
+      bool adc_sequencer;
+      bool adc_measurement;
+      bool bleeder_resistor_load;
+    } warnings;
+
+    bool error_present;
+    struct Errors {
+      bool eprom_read;
+      bool hw_fault;
+      bool rfe_input_missing;
+      bool can_timeout;
+      bool feedback_signal;
+      bool mains_voltage_min;
+      bool motor_overheat;
+      bool endstage_overheat;
+      bool mains_voltage_max;
+      bool critical_ac_current;
+      bool race_away;
+      bool ecode_timeout;
+      bool watchdog_reset;
+      bool ac_current_offset;
+      bool internal_hw_voltage;
+      bool bleed_resistor_overload;
+    } errors;
+  };
+
+  FullCANFrame readCAN();
+
+  FullCANFrame::ProcessedStatusWord handleStatusWord(uint16_t word);
 };
 
 #endif // INCLUDE_INCLUDE_MOTOR_H_

@@ -24,17 +24,20 @@ uint32_t Motor::tBuzzerOff = 0;
 
 // #include "brake_light.h"
 // #include "header.h"
+#include "WString.h"
 #include "motor.h"
 #include <FlexCAN_T4.h>
 #include <cstdint>
 // ---------- helpers ----------
 
 // TODO ask Shane about how this works and how "word" is derived and defined
-void Motor::handleStatusWord(uint16_t word) {
+Motor::FullCANFrame::ProcessedStatusWord
+Motor::handleStatusWord(uint16_t word) {
+  FullCANFrame::ProcessedStatusWord returnValue;
   statusWord = word;
-  faultActive = (word & 0x0040) != 0;
-  const bool enableBit = (word & 0x0001) != 0;
-  const bool readyBit = (word & 0x0004) != 0;
+  returnValue.faultActive = (word & 0x0040) != 0;
+  returnValue.enableBit = (word & 0x0001) != 0;
+  returnValue.readyBit = (word & 0x0004) != 0;
 
   if (faultActive) {
     if (readyToDrive && DEBUG_MODE)
@@ -49,10 +52,10 @@ void Motor::handleStatusWord(uint16_t word) {
         digitalWrite(BUZZER_PIN, LOW);
       tBuzzerOff = 0;
     }
-    return;
+    return returnValue;
   }
 
-  if (enableBit && readyBit) {
+  if (returnValue.enableBit && returnValue.readyBit) {
     if (!readyToDrive) {
       readyToDrive = true;
       rtdRequestPending = false;
@@ -65,6 +68,8 @@ void Motor::handleStatusWord(uint16_t word) {
       if (DEBUG_MODE)
         Serial.println("Inverter confirmed RTD.");
     }
+    // Unsure if these should be handled by global state or by
+    // ProcessedStatusWord
   } else if (readyToDrive) {
     readyToDrive = false;
     tPendingReady = 0;
@@ -76,6 +81,7 @@ void Motor::handleStatusWord(uint16_t word) {
     if (DEBUG_MODE)
       Serial.println("Inverter exited RTD state.");
   }
+  return returnValue;
 }
 
 std::optional<bool> Motor::getFromBitfield(uint16_t bitfieldAddr, uint8_t bit) {
@@ -95,7 +101,8 @@ std::optional<bool> Motor::getFromBitfield(uint16_t bitfieldAddr, uint8_t bit) {
   return std::nullopt;
 }
 
-void Motor::readCAN() {
+Motor::FullCANFrame Motor::readCAN() {
+  FullCANFrame returnValue;
   CAN_message_t msg;
   while (Can1.read(msg)) {
     // Logging::logCANFrame(msg, "RX");
@@ -104,15 +111,19 @@ void Motor::readCAN() {
     const uint8_t reg = msg.buf[0];
 
     if (reg == ADDRS::STATUS) { // status word
-      const uint16_t word = uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8);
-      this->handleStatusWord(word);
+      returnValue.rawStatusWord =
+          uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8);
+      returnValue.statusWord =
+          this->handleStatusWord(returnValue.rawStatusWord);
     } else if (reg == ADDRS::RPM) { // rpm
-      rpmFeedback = int16_t(uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8));
+      returnValue.rpmFeedback =
+          int16_t(uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8));
     } else if (reg == ADDRS::READ_DC) { // dc bus voltage 0.1 V/LSB
-      dcBusVoltage =
+      returnValue.dcBusVoltage =
           0.1f * float(uint16_t(msg.buf[1]) | (uint16_t(msg.buf[2]) << 8));
     }
   }
+  return returnValue;
 }
 
 // static bool brakeActive() { return BrakeLight::is_active(); }
@@ -161,7 +172,7 @@ void Motor::tryEnterRTD() {
 
 void Motor::update() {
   Can1.events();
-  readCAN();
+  FullCANFrame current_can = readCAN();
 
   if (rtdRequestPending && (millis() - tPendingReady) > 2000) {
     rtdRequestPending = false;
@@ -171,8 +182,8 @@ void Motor::update() {
 
   // re-issue cyclic requests every few seconds for keep-alive robustness
   if (millis() - tLastReissue > 5000) {
-    requestCyclic(0x40, STATUS_REQ_INTERVAL_MS);
-    requestCyclic(0x30, RPM_REQ_INTERVAL_MS);
+    requestCyclic(ADDRS::STATUS, STATUS_REQ_INTERVAL_MS);
+    requestCyclic(ADDRS::RPM, RPM_REQ_INTERVAL_MS);
     tLastReissue = millis();
   }
 
