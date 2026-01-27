@@ -1032,9 +1032,9 @@
         "output": ".pio/build/teensy41/src/main.cpp.o"
     },
     {
-        "command": "/Users/shanewhelan/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin/arm-none-eabi-g++ -o .pio/build/teensy41/src/motor_controller.cpp.o -c -fno-exceptions -felide-constructors -fno-rtti -std=gnu++17 -Wno-error=narrowing -fpermissive -fno-threadsafe-statics -Wall -ffunction-sections -fdata-sections -mthumb -mcpu=cortex-m7 -nostdlib -mfloat-abi=hard -mfpu=fpv5-d16 -O2 -DPLATFORMIO=60118 -D__IMXRT1062__ -DARDUINO_TEENSY41 -DUSB_SERIAL -DARDUINO=10805 -DTEENSYDUINO=159 -DCORE_TEENSY -DF_CPU=600000000 -DLAYOUT_US_ENGLISH -Iinclude -Isrc -Ilib/ITEADLIB_Arduino_Nextion-master -I/Users/shanewhelan/.platformio/packages/framework-arduinoteensy/libraries/SD/src -I/Users/shanewhelan/.platformio/packages/framework-arduinoteensy/libraries/SdFat/src -I/Users/shanewhelan/.platformio/packages/framework-arduinoteensy/libraries/SoftwareSerial -I/Users/shanewhelan/.platformio/packages/framework-arduinoteensy/libraries/FlexCAN_T4 \"-I.pio/libdeps/teensy41/Adafruit MPU6050\" \"-I.pio/libdeps/teensy41/Adafruit Unified Sensor\" \"-I.pio/libdeps/teensy41/Adafruit BusIO\" -I/Users/shanewhelan/.platformio/packages/framework-arduinoteensy/libraries/SPI -I/Users/shanewhelan/.platformio/packages/framework-arduinoteensy/libraries/Wire -I/Users/shanewhelan/.platformio/packages/framework-arduinoteensy/libraries/Wire/utility -I/Users/shanewhelan/.platformio/packages/framework-arduinoteensy/cores/teensy4 src/motor_controller.cpp",
-        "directory": "/Users/shanewhelan/Documents/GitHub/TEENSY",
-        "file": "src/motor_controller.cpp",
-        "output": ".pio/build/teensy41/src/motor_controller.cpp.o"
+        "command": "/home/laptop-main/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin/arm-none-eabi-g++ -o .pio/build/teensy41/src/motor.cpp.o -c -fno-exceptions -felide-constructors -fno-rtti -std=gnu++17 -Wno-error=narrowing -fpermissive -fno-threadsafe-statics -Wall -ffunction-sections -fdata-sections -mthumb -mcpu=cortex-m7 -nostdlib -mfloat-abi=hard -mfpu=fpv5-d16 -O2 -DPLATFORMIO=60118 -D__IMXRT1062__ -DARDUINO_TEENSY41 -DUSB_SERIAL -DARDUINO=10805 -DTEENSYDUINO=159 -DCORE_TEENSY -DF_CPU=600000000 -DLAYOUT_US_ENGLISH -Iinclude -Isrc -I/home/laptop-main/.platformio/packages/framework-arduinoteensy/libraries/FlexCAN_T4 -I/home/laptop-main/.platformio/packages/framework-arduinoteensy/cores/teensy4 src/motor.cpp",
+        "directory": "/home/laptop-main/repos/ucdfs/TEENSY",
+        "file": "src/motor.cpp",
+        "output": ".pio/build/teensy41/src/motor.cpp.o"
     }
 ]
