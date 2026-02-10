@@ -1,9 +1,16 @@
 #include <Arduino.h>
+#include "BMSManager.h"
 
+// Added just to prove it links
 void setup() {
-  // put your setup code here, to run once:
+  BMSManager::init();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  BMSManager::update();
+
+  // Other modules should ONLY use getters
+  // bool online = BMSManager::isOnline();
+
+  delay(10);
 }
