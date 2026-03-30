@@ -9,4 +9,4 @@
 #define LOG_SERIAL false
 #define MAX_BUF 16
 #define MAX_LOG_LEN 128
-extern File logFile; 
+extern FsFile logFile; 
