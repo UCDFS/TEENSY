@@ -8,11 +8,16 @@ Adafruit_MPU6050 mpu;
 MpuController mpuController(mpu);
 
 void setup() {
-  // put your setup code here, to run once:
+  Logger::begin();
+  Logger::log(LogLevel::INFO, "Main", "System booting up, initialising components");
 
+  mpuController.begin();
+  Logger::log(LogLevel::INFO, "Main", "MPU initialized successfully");
 
+  Logger::log(LogLevel::INFO, "Main", "System initialized, starting main loop");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  mpuController.logTelemetry();
+  
 }

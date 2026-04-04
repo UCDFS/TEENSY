@@ -11,7 +11,6 @@ private:
   float _accelOffsetX;
   float _accelOffsetY;
   float _accelOffsetZ;
-  float _tempOffset;
 
   bool calibrate();
 public:

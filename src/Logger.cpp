@@ -9,7 +9,7 @@ const char* Logger::levelToStr(LogLevel level) {
         case LogLevel::ERROR:   return "ERROR";
         case LogLevel::WARNING: return "WARN";
         case LogLevel::DEBUG:   return "DEBUG";
-        default:              return "INFO";
+        default:                return "INFO";
     }
 }
 
@@ -18,6 +18,8 @@ void Logger::log(LogLevel level, const char* module, const char* msg) {
     snprintf(entry.data, MAX_LOG_LEN, "[%s] %s: %s", levelToStr(level), module, msg);
     
     _logBuffer.push(entry);
+    //TODO: consider having mode for nextion to display logs in real time
+    //      serial writing is better done in smaller bursts, so use different buffer
 }
 
 bool Logger::begin() {

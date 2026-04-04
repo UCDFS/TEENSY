@@ -18,7 +18,6 @@ bool MpuController::calibrate() {
     _accelOffsetX += a.acceleration.x;
     _accelOffsetY += a.acceleration.y;
     _accelOffsetZ += a.acceleration.z;
-    _tempOffset += t.temperature;
     delay(10);
   }
 
@@ -28,7 +27,6 @@ bool MpuController::calibrate() {
   _accelOffsetX /= 100.0;
   _accelOffsetY /= 100.0;
   _accelOffsetZ /= 100.0;
-  _tempOffset /= 100.0;
 
   return true;
 }
@@ -39,9 +37,11 @@ bool MpuController::begin() {
     if (_mpuFound) {
       break;
     }
+    delay(100);
   }
   if (!_mpuFound) {
-    // print nextion MPU not found after 3 tries, continuing without");
+    // TODO: print nextion MPU not found after 3 tries, continuing without");
+    Logger::log(LogLevel::ERROR, "IMU", "MPU not found after 3 tries, continuing without gyro telemetry");
     return false;
   }
   
@@ -49,16 +49,24 @@ bool MpuController::begin() {
   _mpu.setGyroRange(MPU_GYRO_RANGE);
   _mpu.setFilterBandwidth(MPU_FILTER_BW);
 
+  //TODO: print nextion MPU found, starting calibration, progress
+  Logger::log(LogLevel::INFO, "IMU", "MPU found, starting calibration");
   if (calibrate()) {
-    // print nextion calibration success
+    // TODO: print nextion calibration success
+    Logger::log(LogLevel::INFO, "IMU", "Calibration successful");
   } else {
-    // print nextion calibration failure
+    // TODO: print nextion calibration failure
+    Logger::log(LogLevel::ERROR, "IMU", "Calibration failed");
   }
 
   return true;
 }
 
 void MpuController::logTelemetry() {
+  if (!_mpuFound) {
+    return;
+  }
+
   sensors_event_t a, g, t;
   this->_mpu.getEvent(&a, &g, &t);
 
@@ -69,7 +77,7 @@ void MpuController::logTelemetry() {
   gX = g.gyro.x - _gyroOffsetX;
   gY = g.gyro.y - _gyroOffsetY;
   gZ = g.gyro.z - _gyroOffsetZ;
-  temp = t.temperature - _tempOffset;
+  temp = t.temperature;
 
   const char* log_msg = 
     "Accel: %.2f, %.2f, %.2f | Gyro: %.2f, %.2f, %.2f | Temp: %.2f";
