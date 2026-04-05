@@ -1,12 +1,16 @@
 #include "MpuController.h"
 
 MpuController::MpuController(Adafruit_MPU6050 mpu) : 
-  _mpu(mpu), _mpuFound(false) {}
+  _mpu(mpu), _mpuFound(false), 
+  _gyroOffsetX(0), _gyroOffsetY(0), _gyroOffsetZ(0), 
+  _accelOffsetX(0), _accelOffsetY(0), _accelOffsetZ(0) {}
 
 bool MpuController::calibrate() {
   if (!_mpuFound) {
     return false;
   }
+
+  // TODO: print nextion calibrating, progress
 
   sensors_event_t a, g, t;
 
