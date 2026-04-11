@@ -19,8 +19,8 @@ void setup() {
 
   mpuController.begin();
 
-  Nextion::bootStatus("INITIALISATION", "Initialization complete, starting main loop");
-  Logger::log(LogLevel::INFO, "Main", "System initialized, starting main loop");
+  Nextion::bootStatus("INITIALISATION", "Initialisation complete, starting main loop");
+  Logger::log(LogLevel::INFO, "Main", "System initialised, starting main loop");
 }
 
 void loop() {
