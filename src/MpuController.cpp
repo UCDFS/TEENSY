@@ -53,13 +53,13 @@ bool MpuController::begin() {
   _mpu.setGyroRange(MPU_GYRO_RANGE);
   _mpu.setFilterBandwidth(MPU_FILTER_BW);
 
-  //TODO: print nextion MPU found, starting calibration, progress
+  Nextion::bootStatus("INITIALISATION", "MPU found, starting calibration");
   Logger::log(LogLevel::INFO, "IMU", "MPU found, starting calibration");
   if (calibrate()) {
-    // TODO: print nextion calibration success
+    Nextion::bootStatus("INITIALISATION", "MPU Calibration successful");
     Logger::log(LogLevel::INFO, "IMU", "Calibration successful");
   } else {
-    // TODO: print nextion calibration failure
+    Nextion::bootStatus("INITIALISATION", "MPU Calibration failed");
     Logger::log(LogLevel::ERROR, "IMU", "Calibration failed");
   }
 
