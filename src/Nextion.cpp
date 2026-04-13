@@ -1,6 +1,7 @@
 #include "Nextion.h"
 
 void Nextion::sendCmd(const char *cmd) {
+  while (NEXTION_SERIAL.available()) NEXTION_SERIAL.read();
   NEXTION_SERIAL.print(cmd);
   NEXTION_SERIAL.write(0xFF); // Nextion command terminator
   NEXTION_SERIAL.write(0xFF);
@@ -27,9 +28,9 @@ void Nextion::sendText(const char *component, const char *text) {
   sendCmd(cmd);
 }
 
-void Nextion::sendNumber(const char *component, uint16_t value) {
+void Nextion::sendNumber(const char *component, int16_t value) {
   char cmd[32];
-  snprintf(cmd, sizeof(cmd), "%s.val=%u", component, value);
+  snprintf(cmd, sizeof(cmd), "%s.val=%d", component, value);
   sendCmd(cmd);
 }
 
@@ -45,6 +46,6 @@ void Nextion::updateDash(DashStatus dashStatus) {
   sendNumber(NX_DRIVE_DCBUS, dashStatus.dcBusV);
   sendText(NX_DRIVE_FAULT, dashStatus.fault ? "FAULT" : "OK");
   sendText(NX_DRIVE_STATE, dashStatus.driveOn ? "DRIVE: ON" : "DRIVE: OFF");
-  sendNumber(NX_DRIVE_MTEMP, dashStatus.mTemp);
-  sendNumber(NX_DRIVE_ITEMP, dashStatus.iTemp);
+  sendNumber(NX_DRIVE_MOTOR_TEMP, dashStatus.motorTemp);
+  sendNumber(NX_DRIVE_INVERTER_TEMP, dashStatus.inverterTemp);
 }

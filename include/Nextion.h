@@ -19,18 +19,18 @@
 #define NX_DRIVE_DCBUS  "n_dcbus"   // number: DC bus voltage, whole volts
 #define NX_DRIVE_FAULT  "t_fault"   // text: "OK" or "FAULT"
 #define NX_DRIVE_STATE  "t_drive"   // text: "DRIVE: ON" or "DRIVE: OFF"
-#define NX_DRIVE_MTEMP  "n_mtemp"   // number: motor temperature, °C
-#define NX_DRIVE_ITEMP  "n_itemp"   // number: inverter temperature, °C
+#define NX_DRIVE_MOTOR_TEMP  "n_mtemp"   // number: motor temperature, °C
+#define NX_DRIVE_INVERTER_TEMP  "n_itemp"   // number: inverter temperature, °C
 
 struct DashStatus {
-  uint16_t speed; // km/h
-  uint16_t rpm;
-  uint8_t torque; 
-  uint16_t dcBusV; 
+  int16_t speed; // km/h
+  int16_t rpm;
+  int16_t torque; 
+  int16_t dcBusV; 
   bool fault;     
   bool driveOn;   
-  uint16_t mTemp;  
-  uint16_t iTemp;  
+  int16_t motorTemp;  
+  int16_t inverterTemp;
 };
 
 class Nextion {
@@ -40,7 +40,7 @@ public:
   static void begin();
   static void page(uint8_t pageNumber);
   static void sendText(const char *component, const char *text);
-  static void sendNumber(const char *component, uint16_t value);
+  static void sendNumber(const char *component, int16_t value);
   static void bootStatus(const char *phase, const char *detail);
   static void updateDash(DashStatus dashStatus);
 };
