@@ -1,5 +1,6 @@
 #include "config.h"
 #include "Logger.h"
+#include "Nextion.h"
 
 class MpuController {
 private:
