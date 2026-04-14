@@ -13,6 +13,7 @@
 #define MAX_BUF 16
 #define MAX_LOG_LEN 128
 extern FsFile logFile; 
+#define SERIAL_DEBUG true
 
 // --------- BUTTON ----------
 #define DEBOUNCE_MS 50

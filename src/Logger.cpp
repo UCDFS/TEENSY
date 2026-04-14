@@ -17,6 +17,10 @@ void Logger::log(LogLevel level, const char* module, const char* msg) {
     LogEntry entry;
     snprintf(entry.data, MAX_LOG_LEN, "[%s] %s: %s", levelToStr(level), module, msg);
     
+    if (SERIAL_DEBUG) {
+      Serial.println(entry.data);
+    }
+    
     _logBuffer.push(entry);
     //TODO: consider having mode for nextion to display logs in real time
     //      serial writing is better done in smaller bursts, so use different buffer
@@ -43,7 +47,7 @@ void Logger::process() {
     uint8_t count = 0;
 
     // Pop and write in small bursts
-    while (_logBuffer.pop(&entry) && count < 5) {
+    while (_logBuffer.pop(entry) && count < 5) {
         logFile.println(entry.data);
         count++;
     }

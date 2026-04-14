@@ -10,14 +10,14 @@ void Nextion::sendCmd(const char *cmd) {
 
 void Nextion::begin() {
   NEXTION_SERIAL.begin(NEXTION_BAUD);
-  delay(100); 
+  delay(100);
   sendCmd(""); // clear RX buffer
   sendCmd("bkcmd=1"); // enable Nextion command feedback
   sendCmd("page 0");
 }
 
 void Nextion::page(uint8_t pageNumber) {
-  char cmd[8];
+  char cmd[16];
   snprintf(cmd, sizeof(cmd), "page %d", pageNumber);
   sendCmd(cmd);
 }
