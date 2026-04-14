@@ -4,7 +4,7 @@
 template <typename T, size_t size>
 class CircularBuffer {
 private:
-  T buffer[size];
+  T _buffer[size];
   size_t _head = 0;
   size_t _tail = 0;
   bool _full = false;
@@ -19,7 +19,7 @@ public:
     _full = _head == _tail;
   }
 
-  bool pop (&T item) {
+  bool pop (T &item) {
     if (isEmpty()) {
       return false;
     }

@@ -11,6 +11,12 @@ Button driveButton(BUTTON_PIN);
 DashStatus dashStatus;
 
 void setup() {
+  if (SERIAL_DEBUG) {
+    Serial.begin(115200);
+    while (!Serial);
+    Serial.println("System Ready!");
+  }
+
   Nextion::begin();
   Nextion::bootStatus("INITIALISATION", "System booting up, initialising components");
 
@@ -21,6 +27,8 @@ void setup() {
 
   Nextion::bootStatus("INITIALISATION", "Initialisation complete, starting main loop");
   Logger::log(LogLevel::INFO, "Main", "System initialised, starting main loop");
+
+  Nextion::page(NX_PAGE_DRIVE);
 }
 
 void loop() {

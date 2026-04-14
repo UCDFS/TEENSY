@@ -1,3 +1,4 @@
+#pragma once
 #include "config.h"
 
 // Nextion connected to Serial7 (TX7/RX7 on Teensy 4.1)
