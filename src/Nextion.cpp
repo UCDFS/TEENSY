@@ -30,6 +30,14 @@ void Nextion::sendText(const char *component, const char *text) {
 
 void Nextion::sendNumber(const char *component, int16_t value) {
   char cmd[32];
+  char buf[8];
+  itoa(value, buf, 10);
+  snprintf(cmd, sizeof(cmd), "%s.txt=\"%s\"", component, buf);
+  sendCmd(cmd);
+}
+
+void Nextion::sendNumberValue(const char *component, int16_t value) {
+  char cmd[32];
   snprintf(cmd, sizeof(cmd), "%s.val=%d", component, value);
   sendCmd(cmd);
 }
@@ -44,8 +52,10 @@ void Nextion::updateDash(DashStatus dashStatus) {
   sendNumber(NX_DRIVE_RPM, dashStatus.rpm);
   sendNumber(NX_DRIVE_TORQUE, dashStatus.torque);
   sendNumber(NX_DRIVE_DCBUS, dashStatus.dcBusV);
-  sendText(NX_DRIVE_FAULT, dashStatus.fault ? "FAULT" : "OK");
-  sendText(NX_DRIVE_STATE, dashStatus.driveOn ? "DRIVE: ON" : "DRIVE: OFF");
+  //sendText(NX_DRIVE_FAULT, dashStatus.fault ? "FAULT" : "OK");
+  //sendText(NX_DRIVE_STATE, dashStatus.driveOn ? "DRIVE: ON" : "DRIVE: OFF");
+  // TODO: update fault and drive state when we have that data from CAN
   sendNumber(NX_DRIVE_MOTOR_TEMP, dashStatus.motorTemp);
   sendNumber(NX_DRIVE_INVERTER_TEMP, dashStatus.inverterTemp);
+  sendNumberValue(NX_DRIVE_SPEED_BAR, dashStatus.torque);
 }

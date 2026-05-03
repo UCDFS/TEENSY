@@ -8,12 +8,12 @@
 
 
 // --------- LOGGING ----------
-#define LOG_SD true
+#define LOG_SD false
 #define LOG_SERIAL false
 #define MAX_BUF 16
 #define MAX_LOG_LEN 128
 extern FsFile logFile; 
-#define SERIAL_DEBUG true
+#define SERIAL_DEBUG false
 
 // --------- BUTTON ----------
 #define DEBOUNCE_MS 50
