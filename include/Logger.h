@@ -2,21 +2,22 @@
 #include "config.h"
 #include "CircularBuffer.h"
 
-enum LogLevel { DEBUG, ERROR, INFO, WARNING };
+enum LogLevel { NONE, ERROR, WARNING, INFO, DEBUG };
 
-// In C++, this is the cleaner way to define a fixed-size char array type
+
 struct LogEntry {
     char data[MAX_LOG_LEN];
 };
 
 class Logger {
 private:
-  static SdFs sd;         // The SD filesystem object
-  static FsFile logFile;  // The log file object
+  static SdFs sd;
+  static FsFile logFile;
+  static LogLevel serialDebug;
     
 public:
   static CircularBuffer<LogEntry, MAX_BUF> _logBuffer;
-  static bool begin();
+  static bool begin(LogLevel debugLevel);
   static void sync();
   static void log(LogLevel level, const char* module, const char* msg);
   static void process();

@@ -17,8 +17,8 @@ void Logger::log(LogLevel level, const char* module, const char* msg) {
     LogEntry entry;
     snprintf(entry.data, MAX_LOG_LEN, "[%s] %s: %s", levelToStr(level), module, msg);
     
-    if (SERIAL_DEBUG) {
-      Serial.println(entry.data);
+    if (serialDebug >= level) {
+        Serial.println(entry.data);
     }
     
     _logBuffer.push(entry);
@@ -26,7 +26,8 @@ void Logger::log(LogLevel level, const char* module, const char* msg) {
     //      serial writing is better done in smaller bursts, so use different buffer
 }
 
-bool Logger::begin() {
+bool Logger::begin(LogLevel serialDebugLevel) {
+    serialDebug = serialDebugLevel;
     // SdioConfig(FIFO_SDIO) tells the Teensy to use the fast onboard slot
     if (!sd.begin(SdioConfig(FIFO_SDIO))) {
         return false;

@@ -11,16 +11,17 @@ Button driveButton(BUTTON_PIN);
 DashStatus dashStatus;
 
 void setup() {
-  if (SERIAL_DEBUG) {
+  Nextion::begin();
+  Nextion::bootStatus("INITIALISATION", "System booting up, initialising components");
+
+  LogLevel serialDebug = LogLevel::NONE;
+  Logger::begin(serialDebug);
+  if (serialDebug != LogLevel::NONE) {
     Serial.begin(115200);
     while (!Serial);
     Serial.println("System Ready!");
   }
 
-  Nextion::begin();
-  Nextion::bootStatus("INITIALISATION", "System booting up, initialising components");
-
-  Logger::begin();
   Logger::log(LogLevel::INFO, "Main", "System booting up, initialising components");
 
   mpuController.begin();

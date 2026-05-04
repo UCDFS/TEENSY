@@ -13,11 +13,25 @@
 #define MAX_BUF 16
 #define MAX_LOG_LEN 128
 extern FsFile logFile; 
-#define SERIAL_DEBUG false
 
 // --------- BUTTON ----------
 #define DEBOUNCE_MS 50
 #define BUTTON_PIN 2
+
+// ---------- APPS (pedal sensor) config ----------
+// Set REST to ADC reading with pedal physically released.
+// Set FULL to ADC reading at maximum pedal travel.
+// Formula handles both rising and falling sensor directions.
+#define APPS1_PIN  A0
+#define APPS2_PIN  A1
+#define APPS1_REST 2884   // calibrate: ADC at physical zero
+#define APPS1_FULL 1835   // calibrate: ADC at full pedal
+#define APPS2_REST 2910   // calibrate: ADC at physical zero
+#define APPS2_FULL 1845   // calibrate: ADC at full pedal
+#define PEDAL_DEADBAND_PERCENT 3
+#define PEDAL_PLAUSIBILITY_PERCENT 10
+#define MAX_ACCEL_PERCENT 100
+#define TORQUE_MAX 32767
 
 // ---------- Adafruit MPU -----------
 #define MPU_ACCEL_RANGE MPU6050_RANGE_8_G
