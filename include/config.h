@@ -8,6 +8,7 @@
 
 
 // --------- LOGGING ----------
+#define SERIAL_LOG_LEVEL LogLevel::NONE  // threshold for logging to serial (NONE to disable)
 #define LOG_SD false
 #define LOG_SERIAL false
 #define MAX_BUF 16
@@ -37,3 +38,8 @@ extern FsFile logFile;
 #define MPU_ACCEL_RANGE MPU6050_RANGE_8_G
 #define MPU_GYRO_RANGE MPU6050_RANGE_500_DEG
 #define MPU_FILTER_BW MPU6050_BAND_21_HZ
+
+// ---------- BAMOCAR ----------
+#define BAMOCAR_RX_ID 0x201  // Teensy → Bamocar
+#define BAMOCAR_TX_ID 0x181  // Bamocar → Teensy
+extern FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1;

@@ -13,11 +13,10 @@ class Logger {
 private:
   static SdFs sd;
   static FsFile logFile;
-  static LogLevel serialDebug;
     
 public:
   static CircularBuffer<LogEntry, MAX_BUF> _logBuffer;
-  static bool begin(LogLevel debugLevel);
+  static bool begin();
   static void sync();
   static void log(LogLevel level, const char* module, const char* msg);
   static void process();

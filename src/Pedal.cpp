@@ -2,8 +2,7 @@
 
 float Pedal::appsPercent(int raw, int rest, int full) {
   float pct = (float)(rest - raw) * 100.0f / (float)(rest - full);
-  if (pct < 0.0f) pct = 0.0f;
-  if (pct > 100.0f) pct = 100.0f;
+  pct = std::clamp(pct, 0.0f, 100.0f);
   return pct;
 }
 
@@ -33,15 +32,13 @@ int16_t Pedal::read() {
       return 0;
     }
   }
+  // TODO: cut power if fault persistent for 100ms
 
   float pct = (pct1 + pct2) * 0.5f;
-  
   if (pct < PEDAL_DEADBAND_PERCENT) {
     pct = 0.0f;
   }
-  if (pct > MAX_ACCEL_PERCENT) {
-    pct = (float)MAX_ACCEL_PERCENT;
-  }
+  pct = std::min(pct, (float)MAX_ACCEL_PERCENT);
 
   return (int16_t)(TORQUE_MAX * (pct / 100.0f));
 }
