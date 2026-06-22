@@ -18,8 +18,20 @@ void Logger::log(LogLevel level, const char* module, const char* msg) {
     snprintf(entry.data, MAX_LOG_LEN, "[%s] %s: %s", levelToStr(level), module, msg);
     
     _logBuffer.push(entry);
-    //TODO: consider having mode for nextion to display logs in real time
-    //      serial writing is better done in smaller bursts, so use different buffer
+}
+
+// ---------- CAN frame logging ----------
+// Record: C,<ms>,<dir>,<id_hex>,<len>,<b0_hex>,...,<b7_hex>
+// Always 13 columns; unused byte fields are empty.
+void Logger::logCANFrame(const CAN_message_t &msg, const char *dir) {
+  char line[80];
+  int n = snprintf(line, 79, "C,%lu,%s,%03lX,%d", millis(), dir, msg.id, msg.len);
+  for (int i = 0; i < 8; i++) {
+    if (i < msg.len) n += snprintf(line + n, 80 - n, ",%02X", msg.buf[i]);
+    else             n += snprintf(line + n, 80 - n, ",");
+  }
+  line[n++] = '\n';
+  log(LogLevel::INFO, "CAN", line);
 }
 
 bool Logger::begin() {
