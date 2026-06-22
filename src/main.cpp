@@ -301,5 +301,15 @@ void loop() {
       CAN::sendTorqueCommand(driveEnabled ? currentTorque : 0);
       lastTorqueSend = millis();
     }
+
+    dashStatus.speed = 0;
+    dashStatus.rpm = rpmFeedback;
+    dashStatus.torque = currentTorque;
+    dashStatus.dcBusV = (int16_t)dcBusVoltage;
+    dashStatus.fault = (bamocarErrorWord != 0);
+    dashStatus.driveOn = driveEnabled;
+    dashStatus.motorTemp = (int16_t)motorTemp;
+    dashStatus.inverterTemp = (int16_t)inverterTemp;
+    Nextion::updateDash(dashStatus);
   }
 }

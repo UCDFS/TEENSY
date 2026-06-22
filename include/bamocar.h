@@ -1,4 +1,5 @@
 #pragma once
+#include "logger.h"
 #include "config.h"
 
 #define REG_TRANSMIT_REQUEST 0x3D
