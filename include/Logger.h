@@ -19,6 +19,7 @@ public:
   static bool begin();
   static void sync();
   static void log(LogLevel level, const char* module, const char* msg);
+  static void logCANFrame(const CAN_message_t &msg, const char *dir);
   static void process();
   static const char* levelToStr(LogLevel level);
 };
