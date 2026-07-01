@@ -35,9 +35,7 @@ int16_t Pedal::read() {
   // TODO: cut power if fault persistent for 100ms
 
   float pct = (pct1 + pct2) * 0.5f;
-  if (pct < PEDAL_DEADBAND_PERCENT) {
-    pct = 0.0f;
-  }
+  pct = std::max(pct, (float)PEDAL_DEADBAND_PERCENT);
   pct = std::min(pct, (float)MAX_ACCEL_PERCENT);
 
   return (int16_t)(TORQUE_MAX * (pct / 100.0f));
