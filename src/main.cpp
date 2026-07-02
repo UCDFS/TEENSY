@@ -17,7 +17,7 @@ Adafruit_MPU6050 MPU;
 MpuController mpuController(MPU);
 Button driveButton(BUTTON_PIN);
 DashStatus dashStatus;
-int8_t currentStep = 0;
+bool driveReady = false;
 int16_t currentTorque = 0;
 uint32_t lastTorqueSend = 0;
 bool bamocarOnline = false;
@@ -32,8 +32,7 @@ int16_t apps1Raw = 0;
 int16_t apps2Raw = 0;
 bool pedalFault = false;
 bool driveEnabled = false;
-uint32_t lastBAMOCARRx = 0;
-bool bamocarOffline = false;
+uint32_t lastBamocarRx = 0;
 bool inErrorState = false;
 
 // ---------- Helpers ----------
@@ -130,39 +129,21 @@ static void reenableDriveSequence() {
   Nextion::page(NX_PAGE_DRIVE);
 }
 
-// ---------- Step Execution ----------
-void executeStep(int step) {
-  currentStep = step;
-  switch (step) {
-    case 1:
-      CAN::requestStatusCyclic(100);
-      CAN::requestErrorsCyclic(100);
-      CAN::requestSpeedCyclic(100);
-      CAN::requestCurrentCyclic(100);
-      CAN::requestTempsCyclic(500);
-      break;
-    case 2:
-      CAN::requestDCBusOnce();
-      break;
-    case 3:
-      CAN::clearErrors();
-      break;
-    case 4:
-      CAN::configureCanTimeout(2000);
-      break;
-    case 5:
-      CAN::clearErrors();
-      delay(100);
-      CAN::enableDrive();
-      CAN::requestStatusOnce();
-      driveEnabled = true;
-      break;
-    case 6:
-      CAN::sendTorqueCommand(0);
-      break;
-    case 7:
-      break;
-  }
+// ---------- Initialization Sequence ----------
+void initCanCommunication() {
+  CAN::requestStatusCyclic(100);
+  CAN::requestErrorsCyclic(100);
+  CAN::requestSpeedCyclic(100);
+  CAN::requestCurrentCyclic(100);
+  CAN::requestTempsCyclic(500);
+}
+
+void enableDriveMode() {
+  CAN::clearErrors();
+  delay(100);
+  CAN::enableDrive();
+  CAN::requestStatusOnce();
+  driveEnabled = true;
 }
 
 // ---------- Setup ----------
@@ -187,10 +168,10 @@ void setup() {
 
   delay(800);
 
-  // --- Step 1: press to start, wait for BAMOCAR ---
+  // --- Wait for start signal, establish BAMOCAR communication ---
   waitForButton("PRESS TO START");
   Nextion::bootStatus("WAITING BAMOCAR", "");
-  executeStep(1);
+  initCanCommunication();
   while (!bamocarOnline) {
     CAN::requestStatusOnce();
     CAN::readCanMessages();
@@ -199,34 +180,34 @@ void setup() {
   Nextion::bootStatus("BAMOCAR ONLINE", "");
   delay(400);
 
-  // --- Steps 2-4: DC bus, clear errors, CAN timeout (automatic) ---
-  executeStep(2);
+  // --- Request DC bus voltage and configure communication ---
+  CAN::requestDCBusOnce();
   delay(200);
   CAN::readCanMessages();
 
-  executeStep(3);
+  CAN::clearErrors();
   delay(200);
 
-  executeStep(4);
+  CAN::configureCanTimeout(2000);
   delay(200);
 
-  // --- Steps 5-7: hold 3s to enable drive and enter torque control ---
+  // --- Wait for user confirmation, then enter drive mode ---
   waitForButtonHeld("HOLD 3s: ENABLE");
   Nextion::bootStatus("ENABLING DRIVE", "");
-  executeStep(5);
+  enableDriveMode();
   delay(500);
-  executeStep(6);
+  CAN::sendTorqueCommand(0);
   delay(500);
 
-  // --- Wait for pedal release (automatic) ---
+  // --- Wait for pedal release before entering control loop ---
   Nextion::bootStatus("RELEASE PEDAL", "");
   while (!pedalAtRest()) {
     CAN::readCanMessages();
     delay(50);
   }
 
-  // --- Step 7: enter torque control ---
-  executeStep(7);
+  // --- Ready for active torque control ---
+  driveReady = true;
   Nextion::page(NX_PAGE_DRIVE);
 }
 
@@ -235,20 +216,17 @@ void loop() {
   CAN::readCanMessages();
   Logger::process();
 
-  if (currentStep == 7) {
-    if (bamocarOnline && millis() - lastBAMOCARRx > 500) {
-      if (!bamocarOffline) {
-        bamocarOffline = true;
-        bamocarOnline = false;
-        driveEnabled = false;
-        CAN::sendTorqueCommand(0);
-        currentTorque = 0;
-        Nextion::page(NX_PAGE_BOOT);
-        Nextion::bootStatus("BAMOCAR OFFLINE", "waiting...");
-      }
-    } else if (bamocarOffline && bamocarOnline) {
-      bamocarOffline = false;
-    }
+  if (!driveReady) {
+    Logger::log(LogLevel::ERROR, "Main", "Loop entered before drive ready (how?)");
+  }
+  if (bamocarOnline && millis() - lastBamocarRx > 500) {
+    bamocarOnline = false;
+    driveEnabled = false;
+    CAN::sendTorqueCommand(0);
+    currentTorque = 0;
+    Nextion::page(NX_PAGE_BOOT);
+    Nextion::bootStatus("BAMOCAR OFFLINE", "waiting...");
+  }
 
     if (bamocarErrorWord != 0) {
       if (!inErrorState) {
@@ -303,5 +281,4 @@ void loop() {
     dashStatus.motorTemp = (int16_t)motorTemp;
     dashStatus.inverterTemp = (int16_t)inverterTemp;
     Nextion::updateDash(dashStatus);
-  }
 }

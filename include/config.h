@@ -8,6 +8,7 @@
 
 // --------- GLOBAL ----------
 extern FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1;
+extern lastBamocarRx;
 
 // --------- LOGGING ----------
 #define SERIAL_LOG_LEVEL LogLevel::NONE  // threshold for logging to serial (NONE to disable)

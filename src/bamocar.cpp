@@ -166,4 +166,48 @@ void bamocarErrorDescription(uint32_t errorWord, char *buf, size_t len) {
   buf[len - 1] = '\0';
 }
 
+// ---------- CAN RX ----------
+void readCanMessages() {
+  CAN_message_t msg;
+  while (Can1.read(msg)) {
+    Logger::logCANFrame(msg, "RX");
+
+    if (msg.id == BAMOCAR_TX_ID && msg.len >= 3) {
+      lastBAMOCARRx = millis();
+      uint8_t reg = msg.buf[0];
+
+      if (reg == REG_STATUS) { // STATUS register
+        bamocarOnline = true;
+        statusWord = (int16_t)(msg.buf[1] | (msg.buf[2] << 8));
+      }
+
+      else if (reg == REG_SPEED_ACTUAL) { // RPM feedback (signed, normalised to NMAX)
+        rpmFeedback = (int16_t)(msg.buf[1] | (msg.buf[2] << 8));
+      }
+
+      else if (reg == REG_CURRENT_ACTUAL) { // I_ACT actual current (signed, normalised to IMAX)
+        actualCurrent = (int16_t)(msg.buf[1] | (msg.buf[2] << 8));
+      }
+
+      else if (reg == 0x49) { // motor temperature (°C)
+        uint16_t raw = msg.buf[1] | (msg.buf[2] << 8);
+        motorTemp = motorADCToTemp(raw);
+      }
+
+      else if (reg == 0x4A) { // inverter (IGBT) temperature (°C)
+        uint16_t raw = msg.buf[1] | (msg.buf[2] << 8);
+        inverterTemp = igbtADCToTemp(raw);
+      }
+
+      else if (reg == REG_DC_BUS_VOLTAGE) { // DC bus voltage (UDC = raw / 31.5848, per BAMOCAR FAQ)
+        dcBusVoltage = (msg.buf[1] | (msg.buf[2] << 8)) / 31.5848f;
+      }
+
+      else if (reg == REG_ERROR_WORD) { // Error register
+        bamocarErrorWord = msg.buf[1] | (msg.buf[2] << 8);
+      }
+    }
+  }
+}
+
 }
