@@ -18,9 +18,22 @@ extern lastBamocarRx;
 #define MAX_LOG_LEN 128
 extern FsFile logFile; 
 
-// --------- BUTTON ----------
+// --------- BUTTONS ----------
+// All buttons wire one leg to GND, other to the Teensy pin: use
+// INPUT_PULLUP, pressed = LOW. No pull-up resistors on the breakout board.
 #define DEBOUNCE_MS 50
-#define BUTTON_PIN 2
+#define BUTTON_PIN 2       // RTD button (J12 pin 1, series R + debounce cap on board)
+#define AUX_BUTTON1_PIN 7  // repurposed ESP32_TX socket (J8 pin 2)
+#define AUX_BUTTON2_PIN 8  // repurposed ESP32_RX socket (J8 pin 3)
+
+// --------- PRECHARGE ----------
+// Output to precharge circuit (J12 pin 3 via series R, pulldown on board
+// keeps it disabled through boot). Drive HIGH to start precharge sequence.
+#define PRECHARGE_EN_PIN 3
+
+// --------- RTD SPEAKER ----------
+// Output, drives speaker MOSFET gate. HIGH = speaker on.
+#define RTD_SPEAKER_EN_PIN 9
 
 // ---------- APPS (pedal sensor) config ----------
 // Set REST to ADC reading with pedal physically released.

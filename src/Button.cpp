@@ -1,17 +1,20 @@
 #include "Button.h"
 
+// Buttons wire the pin to GND (no pull-ups on the breakout board):
+// INPUT_PULLUP, pin reads LOW while pressed. State variables hold the
+// logical pressed state, not the raw pin level.
 Button::Button(int pin) : _pin(pin),
-                          _lastState(LOW), 
-                          _lastEdgeTime(0), 
+                          _lastState(false),
+                          _lastEdgeTime(0),
                           _holdStartTime(0) {
-  pinMode(_pin, INPUT_PULLDOWN);
+  pinMode(_pin, INPUT_PULLUP);
 }
 
 bool Button::isPressed() {
-  bool currentState = digitalRead(_pin);
+  bool currentState = digitalRead(_pin) == LOW;
   uint32_t currentTime = millis();
 
-  if (_lastState == LOW && currentState == HIGH 
+  if (!_lastState && currentState
       && (currentTime - _lastEdgeTime) > DEBOUNCE_MS) {
     _lastEdgeTime = currentTime;
     _lastState = currentState;
@@ -23,10 +26,10 @@ bool Button::isPressed() {
 }
 
 bool Button::isReleased() {
-  bool currentState = digitalRead(_pin);
+  bool currentState = digitalRead(_pin) == LOW;
   uint32_t currentTime = millis();
 
-  if (_lastState == HIGH && currentState == LOW 
+  if (_lastState && !currentState
       && (currentTime - _lastEdgeTime) > DEBOUNCE_MS) {
     _lastEdgeTime = currentTime;
     _lastState = currentState;
@@ -38,7 +41,7 @@ bool Button::isReleased() {
 }
 
 bool Button::heldFor(uint16_t duration_ms) {
-  if (digitalRead(_pin) == LOW) {
+  if (digitalRead(_pin) == HIGH) {
     _holdStartTime = 0;
     return false;
   }

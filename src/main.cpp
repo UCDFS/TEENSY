@@ -79,7 +79,7 @@ static void waitForButtonHeld(const char *prompt) {
       lastHeartbeat = millis();
     }
 
-    if (digitalRead(BUTTON_PIN) == HIGH) {
+    if (digitalRead(BUTTON_PIN) == LOW) {  // active low: pressed = LOW
       if (holdStart == 0) holdStart = millis();
       uint32_t elapsed = millis() - holdStart;
       if (elapsed >= DRIVE_HOLD_MS) break;
@@ -245,7 +245,7 @@ void loop() {
 
     static uint32_t holdStart = 0;
     if (!driveEnabled) {
-      if (digitalRead(BUTTON_PIN) == HIGH) {
+      if (digitalRead(BUTTON_PIN) == LOW) {  // active low: pressed = LOW
         if (holdStart == 0) holdStart = millis();
         uint32_t elapsed = millis() - holdStart;
         if (elapsed >= DRIVE_HOLD_MS) {
