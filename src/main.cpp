@@ -1,284 +1,38 @@
+// Raw sensor readout firmware
+//
+// Prints raw ADC counts for APPS1, APPS2, brake front and brake rear
+// at 10 Hz over USB serial. No CAN, no dash, no logging - bench tool
+// for sensor calibration and wiring checks.
+//
+// Pins per Teensy 4.1 breakout board netlist:
+//   APPS1        pin 14 / A0
+//   APPS2        pin 15 / A1
+//   Brake front  pin 16 / A2
+//   Brake rear   pin 17 / A3
+
 #include <Arduino.h>
-#include "config.h"
-#include "Logger.h"
-#include "bamocar.h"
-#include "Button.h"
-#include "MpuController.h"
-#include "Nextion.h"
 
-#define DRIVE_HOLD_MS      3000
-#define CAN_TIMEOUT_MS     2000
-#define TEMP_CAN_TIMEOUT_MS 500
-#define CAN_READ_DELAY_MS  50
+#define APPS1_PIN       A0
+#define APPS2_PIN       A1
+#define BRAKE_FRONT_PIN A2
+#define BRAKE_REAR_PIN  A3
 
-// ---------- Global definitions ----------
-FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1;
-Adafruit_MPU6050 MPU;
-MpuController mpuController(MPU);
-Button driveButton(BUTTON_PIN);
-DashStatus dashStatus;
-bool driveReady = false;
-int16_t currentTorque = 0;
-uint32_t lastTorqueSend = 0;
-bool bamocarOnline = false;
-int16_t rpmFeedback = 0;
-int16_t statusWord = 0;
-uint32_t bamocarErrorWord = 0;
-int16_t actualCurrent = 0;
-float motorTemp = 0.0f;
-float inverterTemp = 0.0f;
-float dcBusVoltage = 0.0f;
-int16_t apps1Raw = 0;
-int16_t apps2Raw = 0;
-bool pedalFault = false;
-bool driveEnabled = false;
-uint32_t lastBamocarRx = 0;
-bool inErrorState = false;
+#define PRINT_INTERVAL_MS 100  // 10 Hz
 
-// ---------- Helpers ----------
-static void holdBar(uint32_t elapsed, uint32_t total, char *buf) {
-  int filled = (int)(elapsed * 10 / total);
-  if (filled > 10) filled = 10;
-  buf[0] = '[';
-  for (int i = 0; i < 10; i++) buf[i + 1] = (i < filled) ? '#' : ' ';
-  buf[11] = ']';
-  buf[12] = '\0';
-}
-
-static bool pedalAtRest() {
-  int raw = analogRead(APPS1_PIN);
-  float pct = (float)(APPS1_REST - raw) * 100.0f / (float)(APPS1_REST - APPS1_FULL);
-  return pct < PEDAL_DEADBAND_PERCENT;
-}
-
-// Blocks until button pressed. Keeps CAN drained and sends a heartbeat
-// every 500 ms so the BAMOCAR CAN timeout never expires while waiting.
-static void waitForButton(const char *prompt) {
-  Nextion::bootStatus(prompt, "press to continue");
-  uint32_t lastHeartbeat = 0;
-  while (!driveButton.isPressed()) {
-    CAN::readCanMessages();
-    if (millis() - lastHeartbeat > 500) {
-      CAN::requestStatusOnce();
-      lastHeartbeat = millis();
-    }
-    delay(10);
-  }
-}
-
-// Blocks until button is held continuously for DRIVE_HOLD_MS.
-// Releasing and re-pressing resets the timer. t_detail shows a progress bar.
-static void waitForButtonHeld(const char *prompt) {
-  Nextion::bootStatus(prompt, "hold 3s to enable");
-  uint32_t lastHeartbeat = 0;
-  uint32_t holdStart = 0;
-  for (;;) {
-    CAN::readCanMessages();
-    if (millis() - lastHeartbeat > 500) {
-      CAN::requestStatusOnce();
-      lastHeartbeat = millis();
-    }
-
-    if (digitalRead(BUTTON_PIN) == LOW) {  // active low: pressed = LOW
-      if (holdStart == 0) holdStart = millis();
-      uint32_t elapsed = millis() - holdStart;
-      if (elapsed >= DRIVE_HOLD_MS) break;
-      char bar[13];
-      holdBar(elapsed, DRIVE_HOLD_MS, bar);
-      Nextion::sendText(NX_BOOT_DETAIL, bar);
-    } else {
-      if (holdStart != 0) Nextion::sendText(NX_BOOT_DETAIL, "hold 3s to enable");
-      holdStart = 0;
-    }
-    delay(10);
-  }
-}
-
-// Full re-enable handshake: mirrors startup steps 3-7.
-// Blocks until handshake is complete and pedal is released.
-static void reenableDriveSequence() {
-  Nextion::bootStatus("RE-ENABLE", "clearing errors...");
-  CAN::requestStatusCyclic(CAN_TIMEOUT_MS);
-  CAN::requestErrorsCyclic(CAN_TIMEOUT_MS);
-  CAN::requestSpeedCyclic(CAN_TIMEOUT_MS);
-  CAN::requestCurrentCyclic(CAN_TIMEOUT_MS);
-  CAN::requestTempsCyclic(TEMP_CAN_TIMEOUT_MS);
-  CAN::clearErrors();
-  delay(CAN_TIMEOUT_MS * 2);
-  CAN::readCanMessages();
-
-  Nextion::bootStatus("RE-ENABLE", "configuring timeout...");
-  CAN::configureCanTimeout(CAN_TIMEOUT_MS);
-  delay(CAN_TIMEOUT_MS * 2);
-
-  Nextion::bootStatus("RE-ENABLE", "enabling drive...");
-  CAN::clearErrors();
-  delay(CAN_TIMEOUT_MS);
-  CAN::enableDrive();
-  CAN::requestStatusOnce();
-  delay(CAN_TIMEOUT_MS * 5);
-  CAN::sendTorqueCommand(0);
-
-  Nextion::bootStatus("RELEASE PEDAL", "");
-  while (!pedalAtRest()) {
-    CAN::readCanMessages();
-    delay(CAN_READ_DELAY_MS);
-  }
-
-  driveEnabled = true;
-  Nextion::page(NX_PAGE_DRIVE);
-}
-
-// ---------- Initialization Sequence ----------
-void initCanCommunication() {
-  CAN::requestStatusCyclic(100);
-  CAN::requestErrorsCyclic(100);
-  CAN::requestSpeedCyclic(100);
-  CAN::requestCurrentCyclic(100);
-  CAN::requestTempsCyclic(500);
-}
-
-void enableDriveMode() {
-  CAN::clearErrors();
-  delay(100);
-  CAN::enableDrive();
-  CAN::requestStatusOnce();
-  driveEnabled = true;
-}
-
-// ---------- Setup ----------
 void setup() {
-  Nextion::begin();
-  Nextion::bootStatus("INITIALISATION", "System booting up, initialising components");
-
-  if (!Logger::begin()) {
-    Nextion::bootStatus("LOGGING", "SD init failed");
-  }
-
-  Logger::log(LogLevel::INFO, "Main", "System booting up, initialising components");
-
-  mpuController.begin();
-
-  Nextion::bootStatus("INITIALISATION", "Initialisation complete, starting main loop");
-  Logger::log(LogLevel::INFO, "Main", "System initialised, starting main loop");
-
-  Can1.begin();
-  Can1.setBaudRate(500000);
-  analogReadResolution(12);
-
-  delay(800);
-
-  // --- Wait for start signal, establish BAMOCAR communication ---
-  waitForButton("PRESS TO START");
-  Nextion::bootStatus("WAITING BAMOCAR", "");
-  initCanCommunication();
-  while (!bamocarOnline) {
-    CAN::requestStatusOnce();
-    CAN::readCanMessages();
-    delay(300);
-  }
-  Nextion::bootStatus("BAMOCAR ONLINE", "");
-  delay(400);
-
-  // --- Request DC bus voltage and configure communication ---
-  CAN::requestDCBusOnce();
-  delay(200);
-  CAN::readCanMessages();
-
-  CAN::clearErrors();
-  delay(200);
-
-  CAN::configureCanTimeout(2000);
-  delay(200);
-
-  // --- Wait for user confirmation, then enter drive mode ---
-  waitForButtonHeld("HOLD 3s: ENABLE");
-  Nextion::bootStatus("ENABLING DRIVE", "");
-  enableDriveMode();
-  delay(500);
-  CAN::sendTorqueCommand(0);
-  delay(500);
-
-  // --- Wait for pedal release before entering control loop ---
-  Nextion::bootStatus("RELEASE PEDAL", "");
-  while (!pedalAtRest()) {
-    CAN::readCanMessages();
-    delay(50);
-  }
-
-  // --- Ready for active torque control ---
-  driveReady = true;
-  Nextion::page(NX_PAGE_DRIVE);
+  Serial.begin(115200);
+  analogReadResolution(12);  // 0-4095, matches existing APPS calibration values
+  analogReadAveraging(4);
 }
 
-// ---------- Loop ----------
 void loop() {
-  CAN::readCanMessages();
-  Logger::process();
+  static uint32_t lastPrint = 0;
+  if (millis() - lastPrint < PRINT_INTERVAL_MS) return;
+  lastPrint = millis();
 
-  if (!driveReady) {
-    Logger::log(LogLevel::ERROR, "Main", "Loop entered before drive ready (how?)");
-  }
-  if (bamocarOnline && millis() - lastBamocarRx > 500) {
-    bamocarOnline = false;
-    driveEnabled = false;
-    CAN::sendTorqueCommand(0);
-    currentTorque = 0;
-    Nextion::page(NX_PAGE_BOOT);
-    Nextion::bootStatus("BAMOCAR OFFLINE", "waiting...");
-  }
-
-    if (bamocarErrorWord != 0) {
-      if (!inErrorState) {
-        inErrorState = true;
-        driveEnabled = false;
-        CAN::sendTorqueCommand(0);
-        currentTorque = 0;
-        char detail[32];
-        CAN::bamocarErrorDescription(bamocarErrorWord, detail, sizeof(detail));
-        Nextion::page(NX_PAGE_BOOT);
-        Nextion::bootStatus("ERROR", detail);
-      }
-    } else if (inErrorState) {
-      inErrorState = false;
-    }
-
-    static uint32_t holdStart = 0;
-    if (!driveEnabled) {
-      if (digitalRead(BUTTON_PIN) == LOW) {  // active low: pressed = LOW
-        if (holdStart == 0) holdStart = millis();
-        uint32_t elapsed = millis() - holdStart;
-        if (elapsed >= DRIVE_HOLD_MS) {
-          holdStart = 0;
-          reenableDriveSequence();
-        } else {
-          char bar[13];
-          holdBar(elapsed, DRIVE_HOLD_MS, bar);
-          Nextion::sendText(NX_DRIVE_STATE, bar);
-        }
-      } else {
-        holdStart = 0;
-      }
-    } else if (driveButton.isPressed()) {
-      CAN::disableDrive();
-      driveEnabled = false;
-      CAN::sendTorqueCommand(0);
-      currentTorque = 0;
-      Nextion::sendText(NX_DRIVE_STATE, "OFF");
-    }
-
-    if (millis() - lastTorqueSend >= 20) {
-      CAN::sendTorqueCommand(driveEnabled ? currentTorque : 0);
-      lastTorqueSend = millis();
-    }
-
-    dashStatus.speed = 0;
-    dashStatus.rpm = rpmFeedback;
-    dashStatus.torque = currentTorque;
-    dashStatus.dcBusV = (int16_t)dcBusVoltage;
-    dashStatus.fault = (bamocarErrorWord != 0);
-    dashStatus.driveOn = driveEnabled;
-    dashStatus.motorTemp = (int16_t)motorTemp;
-    dashStatus.inverterTemp = (int16_t)inverterTemp;
-    Nextion::updateDash(dashStatus);
+  char line[80];
+  snprintf(line, sizeof(line), "APPS1:%4d  APPS2:%4d  BRAKE_F:%4d  BRAKE_R:%4d",
+           analogRead(APPS1_PIN), analogRead(APPS2_PIN),
+           analogRead(BRAKE_FRONT_PIN), analogRead(BRAKE_REAR_PIN));
+  Serial.println(line);
 }
