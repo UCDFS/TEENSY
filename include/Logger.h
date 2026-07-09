@@ -2,7 +2,7 @@
 #include "config.h"
 #include "CircularBuffer.h"
 
-enum LogLevel { NONE, ERROR, WARNING, INFO, DEBUG };
+enum class LogLevel { NONE, ERROR, WARNING, INFO, DEBUG };
 
 
 struct LogEntry {

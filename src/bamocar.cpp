@@ -123,6 +123,19 @@ void disableDrive() {
   sendCAN(msg);
 }
 
+// BAMOCAR FAQ Q10 ("How to configure CAN-Time-Out..."): a CAN-timeout
+// (BUS TIMEOUT) fault can only be erased while the drive is locked - the
+// plain 0x8E clear-errors message alone does nothing for it. Unlocking
+// (the Lock->Enable sequence from Q9) is what actually erases it, so
+// clear -> lock -> enable -> immediately re-lock, leaving the drive
+// exactly as off as it was before a bare RTD press called this.
+void clearErrorsSequence() {
+  clearErrors();
+  enableDrive();
+  delay(100);
+  disableDrive();
+}
+
 void sendTorqueCommand(int16_t torqueValue) {
   CAN_message_t msg = {0};
   msg.id = BAMOCAR_RX_ID;
@@ -131,6 +144,38 @@ void sendTorqueCommand(int16_t torqueValue) {
   msg.buf[1] = torqueValue & 0xFF;
   msg.buf[2] = (torqueValue >> 8) & 0xFF;
   sendCAN(msg);
+}
+
+// ---------- IGBT temperature conversion ----------
+// BAMOCAR-PG-D3-700/400 manual p.49, "6.2 Power stages - temperature":
+// 3x NTC in IGBT, register 0x4A. Num vs degC, linearly interpolated between
+// table points and clamped at the ends (table only spans -30 to 125 C).
+struct TempPoint { uint16_t num; float degC; };
+static const TempPoint IGBT_TEMP_TABLE[] = {
+  {16308, -30}, {16387, -25}, {16487, -20}, {16609, -15}, {16757, -10},
+  {16938,  -5}, {17151,   0}, {17400,   5}, {17688,  10}, {18017,  15},
+  {18387,  20}, {18797,  25}, {19247,  30}, {19733,  35}, {20250,  40},
+  {20793,  45}, {21357,  50}, {21933,  55}, {22515,  60}, {23097,  65},
+  {23671,  70}, {24232,  75}, {24775,  80}, {25296,  85}, {25792,  90},
+  {26261,  95}, {26702, 100}, {27114, 105}, {27497, 110}, {27851, 115},
+  {28179, 120}, {28480, 125},
+};
+#define IGBT_TEMP_TABLE_LEN (sizeof(IGBT_TEMP_TABLE) / sizeof(IGBT_TEMP_TABLE[0]))
+
+float igbtADCToTemp(uint16_t raw) {
+  if (raw <= IGBT_TEMP_TABLE[0].num) return IGBT_TEMP_TABLE[0].degC;
+  if (raw >= IGBT_TEMP_TABLE[IGBT_TEMP_TABLE_LEN - 1].num)
+    return IGBT_TEMP_TABLE[IGBT_TEMP_TABLE_LEN - 1].degC;
+
+  for (size_t i = 1; i < IGBT_TEMP_TABLE_LEN; i++) {
+    if (raw <= IGBT_TEMP_TABLE[i].num) {
+      const TempPoint &lo = IGBT_TEMP_TABLE[i - 1];
+      const TempPoint &hi = IGBT_TEMP_TABLE[i];
+      float frac = (float)(raw - lo.num) / (float)(hi.num - lo.num);
+      return lo.degC + frac * (hi.degC - lo.degC);
+    }
+  }
+  return IGBT_TEMP_TABLE[IGBT_TEMP_TABLE_LEN - 1].degC;  // unreachable
 }
 
 // ---------- Error word lookup (RegID 0x8F, BAMOCAR-PG-D3 Manual) ----------
@@ -173,7 +218,7 @@ void readCanMessages() {
     Logger::logCANFrame(msg, "RX");
 
     if (msg.id == BAMOCAR_TX_ID && msg.len >= 3) {
-      lastBAMOCARRx = millis();
+      lastBamocarRx = millis();
       uint8_t reg = msg.buf[0];
 
       if (reg == REG_STATUS) { // STATUS register
@@ -190,8 +235,11 @@ void readCanMessages() {
       }
 
       else if (reg == 0x49) { // motor temperature (°C)
-        uint16_t raw = msg.buf[1] | (msg.buf[2] << 8);
-        motorTemp = motorADCToTemp(raw);
+        // TODO: no conversion table yet - the BAMOCAR docs only cover the
+        // IGBT NTC curve (see igbtADCToTemp above), not the motor's own
+        // sensor (EMRAX, likely KTY84). Not converting raw -> motorTemp
+        // until that curve is confirmed, rather than reporting a wrong
+        // number that could mask a real motor overtemp.
       }
 
       else if (reg == 0x4A) { // inverter (IGBT) temperature (°C)

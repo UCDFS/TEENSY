@@ -23,7 +23,7 @@ void Nextion::page(uint8_t pageNumber) {
 }
 
 void Nextion::sendText(const char *component, const char *text) {
-  char cmd[80];
+  char cmd[160];  // t_systems' multi-row status text can run past the old 80
   snprintf(cmd, sizeof(cmd), "%s.txt=\"%s\"", component, text);
   sendCmd(cmd);
 }

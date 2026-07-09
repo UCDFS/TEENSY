@@ -18,7 +18,17 @@
 #define BAMOCAR_RX_ID 0x201  // Teensy → Bamocar
 #define BAMOCAR_TX_ID 0x181  // Bamocar → Teensy
 
-namespace CAN 
+// Shared with main.cpp, updated from CAN RX in readCanMessages()
+extern bool bamocarOnline;
+extern int16_t statusWord;
+extern int16_t rpmFeedback;
+extern int16_t actualCurrent;
+extern float motorTemp;
+extern float inverterTemp;
+extern float dcBusVoltage;
+extern uint32_t bamocarErrorWord;
+
+namespace CAN
 {
 void requestStatusCyclic(uint8_t interval_ms);
 void requestErrorsCyclic(uint8_t interval_ms);
@@ -30,9 +40,11 @@ void requestDCBusOnce();
 void clearErrors();
 void enableDrive();
 void disableDrive();
+void clearErrorsSequence();
 void sendTorqueCommand(int16_t torqueValue);
 void configureCanTimeout(uint16_t ms);
 void sendCAN(const CAN_message_t &msg);
 void readCanMessages();
 void bamocarErrorDescription(uint32_t errorWord, char *buf, size_t len);
+float igbtADCToTemp(uint16_t raw);
 }

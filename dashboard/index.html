@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TEENSY VCU Live Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c232d; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --on: #3fb950; --off: #484f58; --warn: #d29922; --err: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+  }
+  header {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: 1px; }
+  button {
+    background: var(--accent); color: #04101f; border: 0; border-radius: 6px;
+    padding: 8px 16px; font: inherit; font-weight: 700; cursor: pointer;
+  }
+  button:disabled { background: var(--off); color: var(--muted); cursor: default; }
+  button.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  .conn { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--off); }
+  .dot.live { background: var(--on); box-shadow: 0 0 8px var(--on); }
+  .dot.stale { background: var(--warn); }
+  .phase {
+    padding: 4px 12px; border-radius: 6px; background: var(--panel2);
+    border: 1px solid var(--border); font-weight: 700; letter-spacing: 1px;
+  }
+  main { padding: 20px; display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 12px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); }
+  .row { display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid var(--panel2); }
+  .row:last-child { border-bottom: 0; }
+  .row .k { color: var(--muted); }
+  .row .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .big { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .bar { height: 10px; background: var(--panel2); border-radius: 5px; overflow: hidden; margin-top: 4px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .08s linear; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    padding: 8px 12px; border-radius: 6px; background: var(--panel2);
+    border: 1px solid var(--border); color: var(--muted); font-weight: 700; flex: 1; text-align: center;
+  }
+  .pill.on { background: var(--on); color: #04140a; border-color: var(--on); }
+  .pill.onWarn { background: var(--warn); color: #1a1400; border-color: var(--warn); }
+  .pill.onErr  { background: var(--err); color: #1a0000; border-color: var(--err); }
+  .console {
+    grid-column: 1 / -1; background: #010409; border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px; height: 260px; overflow-y: auto;
+    font-size: 12px; line-height: 1.5; white-space: pre-wrap;
+  }
+  .console .info { color: var(--muted); }
+  .console .warn { color: var(--warn); }
+  .console .err  { color: var(--err); }
+  .console .can  { color: #6e7681; }
+  .console .evt  { color: var(--accent); }
+  .toolbar { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toolbar label { color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .notice { grid-column: 1/-1; background: #2d1a00; border: 1px solid var(--warn);
+    color: #f0d090; padding: 12px 16px; border-radius: 10px; }
+  code { background: var(--panel2); padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TEENSY VCU</h1>
+  <button id="connect">Connect Serial</button>
+  <button id="disconnect" class="secondary" disabled>Disconnect</button>
+  <span class="phase" id="phase">—</span>
+  <div class="conn">
+    <span class="dot" id="dot"></span>
+    <span id="connText" class="muted">disconnected</span>
+    <span id="rate" class="muted"></span>
+  </div>
+</header>
+
+<main>
+  <div class="notice" id="notice" style="display:none"></div>
+
+  <!-- Drive / system state -->
+  <div class="card">
+    <h2>Drive State</h2>
+    <div class="pills" style="margin-bottom:12px">
+      <span class="pill" id="p-driveReady">READY</span>
+      <span class="pill" id="p-driveEn">DRIVE ON</span>
+      <span class="pill" id="p-bamOnline">BAMOCAR</span>
+    </div>
+    <div class="row"><span class="k">Fault</span><span class="v" id="v-errDesc">OK</span></div>
+    <div class="row"><span class="k">Error word</span><span class="v" id="v-err">0</span></div>
+    <div class="row"><span class="k">Status word</span><span class="v" id="v-status">0</span></div>
+  </div>
+
+  <!-- APPS -->
+  <div class="card">
+    <h2>Accelerator (APPS)</h2>
+    <div class="row"><span class="k">APPS1</span><span class="v"><span id="v-apps1Pct">0.0</span>% <span class="muted" id="v-apps1">(0)</span></span></div>
+    <div class="bar"><div id="bar-apps1"></div></div>
+    <div class="row" style="margin-top:8px"><span class="k">APPS2</span><span class="v"><span id="v-apps2Pct">0.0</span>% <span class="muted" id="v-apps2">(0)</span></span></div>
+    <div class="bar"><div id="bar-apps2"></div></div>
+    <div class="row" style="margin-top:8px"><span class="k">Plausibility Δ</span><span class="v" id="v-appsDiff">0.0%</span></div>
+  </div>
+
+  <!-- Brake -->
+  <div class="card">
+    <h2>Brake</h2>
+    <div class="pills" style="margin-bottom:12px">
+      <span class="pill" id="p-brake">BRAKE / LIGHT</span>
+    </div>
+    <div class="row"><span class="k">Front pressure</span>
+      <span class="v big" id="v-brakeFBar">0.0</span>
+      <span class="muted">bar / <span id="v-brakeFPsi">0.0</span> psi</span></div>
+    <div class="bar"><div id="bar-brakeF"></div></div>
+    <div class="row" style="margin-top:8px"><span class="k">Rear pressure</span>
+      <span class="v big" id="v-brakeRBar">0.0</span>
+      <span class="muted">bar / <span id="v-brakeRPsi">0.0</span> psi</span></div>
+    <div class="bar"><div id="bar-brakeR"></div></div>
+    <div class="row" style="margin-top:8px"><span class="k">Raw ADC</span>
+      <span class="v muted" id="v-brakeRaw">F:0 R:0</span></div>
+  </div>
+
+  <!-- Buttons / outputs -->
+  <div class="card">
+    <h2>Buttons &amp; Outputs</h2>
+    <div class="pills" style="margin-bottom:8px">
+      <span class="pill" id="p-rtd">RTD</span>
+      <span class="pill" id="p-aux1">AUX1</span>
+      <span class="pill" id="p-aux2">AUX2</span>
+    </div>
+    <div class="pills">
+      <span class="pill" id="p-precharge">PRECHARGE</span>
+    </div>
+  </div>
+
+  <!-- Motor / inverter -->
+  <div class="card">
+    <h2>Motor / Inverter</h2>
+    <div class="pills" style="margin-bottom:12px">
+      <span class="pill" id="p-bspd">BSPD FAULT</span>
+    </div>
+    <div class="row"><span class="k">RPM</span><span class="v big" id="v-rpm">0</span></div>
+    <div class="row"><span class="k">Torque cmd</span><span class="v" id="v-torque">0</span> <span class="muted">(<span id="v-torquePct">0.0</span>%)</span></div>
+    <div class="row"><span class="k">DC bus</span><span class="v" id="v-dcBus">0.0 V</span></div>
+    <div class="row"><span class="k">Inverter temp</span><span class="v" id="v-invTemp">0.0 °C</span></div>
+    <div class="row"><span class="k">Motor temp</span><span class="v" id="v-motorTemp">— (no cal)</span></div>
+  </div>
+
+  <!-- IMU -->
+  <div class="card">
+    <h2>IMU / Decel Brake Light</h2>
+    <div class="pills" style="margin-bottom:12px">
+      <span class="pill" id="p-imuFound">MPU</span>
+      <span class="pill" id="p-decelBrake">DECEL TRIGGER</span>
+    </div>
+    <div class="row"><span class="k">Accel X / Y / Z</span>
+      <span class="v" id="v-accel">0.00 / 0.00 / 0.00</span></div>
+    <div class="row" style="margin-top:8px"><span class="k">Calibration</span>
+      <button id="calStart" style="padding:4px 10px">Start Calibration</button></div>
+    <div class="row" style="margin-top:4px"><span class="k" id="v-calStatus">Idle</span></div>
+    <div class="bar"><div id="bar-cal"></div></div>
+    <div class="row" style="margin-top:8px"><span class="k">Detected result</span>
+      <span class="v" id="v-calResult">—</span></div>
+  </div>
+
+  <!-- Timing -->
+  <div class="card">
+    <h2>Link</h2>
+    <div class="row"><span class="k">Teensy uptime</span><span class="v" id="v-t">0 s</span></div>
+    <div class="row"><span class="k">Msg rate</span><span class="v" id="v-msgrate">0 Hz</span></div>
+    <div class="row"><span class="k">Last update</span><span class="v" id="v-age">— ms ago</span></div>
+    <div class="row"><span class="k">CAN frames</span><span class="v" id="v-canCount">0</span></div>
+  </div>
+
+  <div class="toolbar">
+    <label><input type="checkbox" id="showCan" checked> show CAN frames</label>
+    <button class="secondary" id="clearLog">clear log</button>
+    <button class="secondary" id="pauseLog">pause log</button>
+  </div>
+  <div class="console" id="console"></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let port, reader, keepReading = false;
+let msgCount = 0, canCount = 0, lastMsgTime = 0, logPaused = false;
+
+// ---- rate meter ----
+let rateWindow = [];
+function tickRate() {
+  const now = performance.now();
+  rateWindow.push(now);
+  while (rateWindow.length && now - rateWindow[0] > 1000) rateWindow.shift();
+}
+setInterval(() => {
+  $('v-msgrate').textContent = rateWindow.length + ' Hz';
+  const age = lastMsgTime ? Math.round(performance.now() - lastMsgTime) : null;
+  $('v-age').textContent = age === null ? '— ms ago' : age + ' ms ago';
+  const dot = $('dot');
+  if (!port) { dot.className = 'dot'; }
+  else if (age !== null && age < 500) { dot.className = 'dot live'; }
+  else { dot.className = 'dot stale'; }
+}, 250);
+
+// ---- Web Serial guard ----
+if (!('serial' in navigator)) {
+  const n = $('notice');
+  n.style.display = 'block';
+  n.innerHTML = 'Web Serial API not available. Use Chrome or Edge, and open this page over ' +
+    '<code>http://localhost</code> or <code>https</code> (not a raw <code>file://</code> path). ' +
+    'Quick serve: <code>cd dashboard && python3 -m http.server 8000</code> then visit ' +
+    '<code>http://localhost:8000</code>.';
+  $('connect').disabled = true;
+}
+
+$('connect').onclick = async () => {
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    $('connect').disabled = true;
+    $('disconnect').disabled = false;
+    $('connText').textContent = 'connected';
+    keepReading = true;
+    readLoop();
+  } catch (e) { logLine('err', '[dashboard] ' + e.message); }
+};
+
+$('disconnect').onclick = async () => { await closePort(); };
+
+async function closePort() {
+  keepReading = false;
+  try { if (reader) { await reader.cancel(); reader.releaseLock(); } } catch {}
+  try { if (port) await port.close(); } catch {}
+  port = null; reader = null;
+  $('connect').disabled = false;
+  $('disconnect').disabled = true;
+  $('connText').textContent = 'disconnected';
+}
+
+// ---- outbound commands (dashboard -> Teensy) ----
+async function sendCommand(cmd) {
+  if (!port || !port.writable) { logLine('err', '[dashboard] not connected'); return; }
+  const writer = port.writable.getWriter();
+  try { await writer.write(new TextEncoder().encode(cmd + '\n')); }
+  finally { writer.releaseLock(); }
+}
+$('calStart').onclick = () => sendCommand('CAL_IMU_START');
+
+async function readLoop() {
+  const decoder = new TextDecoderStream();
+  const readableClosed = port.readable.pipeTo(decoder.writable).catch(() => {});
+  reader = decoder.readable.getReader();
+  let buf = '';
+  try {
+    while (keepReading) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).replace(/\r$/, '');
+        buf = buf.slice(nl + 1);
+        if (line.length) handleLine(line);
+      }
+    }
+  } catch (e) {
+    logLine('err', '[dashboard] read error: ' + e.message);
+  }
+}
+
+function handleLine(line) {
+  const t = line.trim();
+  if (t.startsWith('{')) {
+    try { applyTelemetry(JSON.parse(t)); msgCount++; lastMsgTime = performance.now(); tickRate(); return; }
+    catch { /* fall through to log */ }
+  }
+  // Non-telemetry: Logger output. Classify for colour.
+  if (t.startsWith('[ERROR]')) logLine('err', t);
+  else if (t.startsWith('[WARN]')) logLine('warn', t);
+  else if (t.includes('CAN:') || t.startsWith('C,')) { canCount++; $('v-canCount').textContent = canCount;
+    if ($('showCan').checked) logLine('can', t); }
+  else logLine('evt', t);
+}
+
+// ---- widget updates ----
+function pill(id, on, cls = 'on') {
+  const el = $(id);
+  el.className = 'pill' + (on ? ' ' + cls : '');
+}
+function bar(id, pct) { $(id).style.width = Math.max(0, Math.min(100, pct)) + '%'; }
+
+function applyTelemetry(d) {
+  $('phase').textContent = d.phase ?? '—';
+
+  pill('p-driveReady', !!d.driveReady);
+  pill('p-driveEn', !!d.driveEn);
+  pill('p-bamOnline', !!d.bamOnline);
+
+  $('v-errDesc').textContent = d.errDesc ?? 'OK';
+  $('v-errDesc').style.color = (d.err && d.err !== 0) ? 'var(--err)' : 'var(--on)';
+  $('v-err').textContent = '0x' + (d.err >>> 0).toString(16).toUpperCase();
+  $('v-status').textContent = d.status;
+
+  $('v-apps1Pct').textContent = fmt(d.apps1Pct); $('v-apps1').textContent = '(' + d.apps1 + ')';
+  $('v-apps2Pct').textContent = fmt(d.apps2Pct); $('v-apps2').textContent = '(' + d.apps2 + ')';
+  bar('bar-apps1', d.apps1Pct); bar('bar-apps2', d.apps2Pct);
+  const diff = Math.abs((d.apps1Pct ?? 0) - (d.apps2Pct ?? 0));
+  const diffEl = $('v-appsDiff');
+  diffEl.textContent = fmt(diff) + '%';
+  diffEl.style.color = diff > 10 ? 'var(--err)' : 'var(--text)';
+
+  pill('p-brake', !!d.brake, 'onWarn');
+  $('v-brakeFBar').textContent = fmt(d.brakeFBar); $('v-brakeFPsi').textContent = fmt(d.brakeFPsi);
+  $('v-brakeRBar').textContent = fmt(d.brakeRBar); $('v-brakeRPsi').textContent = fmt(d.brakeRPsi);
+  $('v-brakeRaw').textContent = 'F:' + d.brakeF + ' R:' + d.brakeR;
+  // sensor is 500 psi / ~34.5 bar full scale
+  bar('bar-brakeF', (d.brakeFBar / 34.5) * 100);
+  bar('bar-brakeR', (d.brakeRBar / 34.5) * 100);
+
+  pill('p-rtd', !!d.rtd); pill('p-aux1', !!d.aux1); pill('p-aux2', !!d.aux2);
+  pill('p-precharge', !!d.precharge, 'onErr');
+
+  pill('p-bspd', !!d.bspdFault, 'onErr');
+  $('v-rpm').textContent = d.rpm;
+  $('v-torque').textContent = d.torque;
+  $('v-torquePct').textContent = fmt(d.torquePct);
+  $('v-dcBus').textContent = fmt(d.dcBus) + ' V';
+  $('v-invTemp').textContent = fmt(d.invTemp) + ' °C';
+  $('v-t').textContent = (d.t / 1000).toFixed(1) + ' s';
+
+  pill('p-imuFound', !!d.imuFound);
+  pill('p-decelBrake', !!d.decelBrake, 'onWarn');
+  $('v-accel').textContent = fmt(d.ax) + ' / ' + fmt(d.ay) + ' / ' + fmt(d.az);
+
+  const cal = d.imuCal ?? {};
+  const calStatusText = {
+    IDLE: 'Idle - click Start, keep car still and level',
+    BASELINE: 'Capturing baseline, keep the car still...',
+    WAIT_TILT: 'Lift the rear now and hold the tilt!',
+    DONE: 'Done - read the result below'
+  }[cal.state] ?? 'Idle';
+  $('v-calStatus').textContent = calStatusText;
+  bar('bar-cal', cal.pct ?? 0);
+  if (cal.state === 'DONE' && cal.axis !== '-') {
+    const axisIndex = { X: 0, Y: 1, Z: 2 }[cal.axis];
+    const sign = cal.sign > 0 ? '+1' : '-1';
+    $('v-calResult').textContent =
+      `axis ${cal.axis} (${axisIndex})  sign ${sign}  peak ${fmt(cal.peak)} m/s²` +
+      `  ->  IMU_DECEL_AXIS ${axisIndex}, IMU_DECEL_SIGN ${sign} in config.h`;
+  } else {
+    $('v-calResult').textContent = '—';
+  }
+  $('calStart').disabled = (cal.state === 'BASELINE' || cal.state === 'WAIT_TILT');
+}
+function fmt(x) { return (x === undefined || x === null) ? '—' : Number(x).toFixed(1); }
+
+// ---- log console ----
+function logLine(cls, text) {
+  if (logPaused) return;
+  const c = $('console');
+  const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 40;
+  const span = document.createElement('div');
+  span.className = cls;
+  span.textContent = text;
+  c.appendChild(span);
+  while (c.childElementCount > 500) c.removeChild(c.firstChild);
+  if (atBottom) c.scrollTop = c.scrollHeight;
+}
+$('clearLog').onclick = () => $('console').innerHTML = '';
+$('pauseLog').onclick = e => { logPaused = !logPaused; e.target.textContent = logPaused ? 'resume log' : 'pause log'; };
+</script>
+</body>
+</html>

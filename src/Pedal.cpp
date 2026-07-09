@@ -1,4 +1,4 @@
-#include "pedal.h"
+#include "Pedal.h"
 
 float Pedal::appsPercent(int raw, int rest, int full) {
   float pct = (float)(rest - raw) * 100.0f / (float)(rest - full);
@@ -12,6 +12,7 @@ int16_t Pedal::read() {
 
   float pct1 = appsPercent(apps1Raw, APPS1_REST, APPS1_FULL);
   float pct2 = appsPercent(apps2Raw, APPS2_REST, APPS2_FULL);
+  pct = (pct1 + pct2) * 0.5f;  // updated even on a fault/deadband return - BSPD needs this live
 
   // Plausibility: sensors must agree within PEDAL_PLAUSIBILITY_PERCENT.
   // Fault only latches after 3 consecutive bad readings (~60ms) to reject
@@ -32,11 +33,16 @@ int16_t Pedal::read() {
       return 0;
     }
   }
-  // TODO: cut power if fault persistent for 100ms
 
-  float pct = (pct1 + pct2) * 0.5f;
-  pct = std::max(pct, (float)PEDAL_DEADBAND_PERCENT);
-  pct = std::min(pct, (float)MAX_ACCEL_PERCENT);
+  // Below the deadband: zero torque, not a floored-up minimum - the old
+  // std::max(pct, DEADBAND) floored idle pedal (pct=0) up to a 3% torque
+  // command, i.e. permanent creep torque at rest.
+  if (pct < PEDAL_DEADBAND_PERCENT) return 0;
 
-  return (int16_t)(TORQUE_MAX * (pct / 100.0f));
+  // Remap deadband..100 -> 0..100 so there's no torque step at the deadband
+  // edge (tip-in should ramp from zero, not jump straight to 3%).
+  float scaled = (pct - PEDAL_DEADBAND_PERCENT) * 100.0f / (100.0f - PEDAL_DEADBAND_PERCENT);
+  scaled = std::min(scaled, (float)MAX_ACCEL_PERCENT);
+
+  return (int16_t)(TORQUE_MAX * (scaled / 100.0f));
 }
