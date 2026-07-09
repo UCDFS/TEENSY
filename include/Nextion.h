@@ -9,6 +9,7 @@
 // ---- Page IDs ----
 #define NX_PAGE_BOOT   0
 #define NX_PAGE_DRIVE  1
+#define NX_PAGE_3      3   // AUX1 hold target - content not yet designed
 
 // ---- Boot page component names (from Nextion Editor) ----
 #define NX_BOOT_STATUS "t_status"   // text: current phase

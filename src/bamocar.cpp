@@ -1,6 +1,7 @@
 #include "bamocar.h"
+#include "Bms.h"
 
-namespace CAN 
+namespace CAN
 {
 
 void sendCAN(const CAN_message_t &msg) {
@@ -254,6 +255,10 @@ void readCanMessages() {
       else if (reg == REG_ERROR_WORD) { // Error register
         bamocarErrorWord = msg.buf[1] | (msg.buf[2] << 8);
       }
+    }
+
+    else if (Bms::isBmsFrame(msg.id)) {
+      Bms::handleFrame(msg);
     }
   }
 }

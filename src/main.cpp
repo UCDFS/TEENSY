@@ -7,6 +7,7 @@
 #include "Pedal.h"
 #include "MpuController.h"
 #include "Nextion.h"
+#include "Bms.h"
 
 #define CAN_TIMEOUT_MS 2000
 
@@ -54,6 +55,16 @@ bool driveEnabled = false;
 uint32_t lastBamocarRx = 0;
 bool inErrorState = false;
 bool sdOk = false;  // Logger::begin() result at boot - no ongoing SD health check
+
+// Tracks whatever we last commanded the Nextion to show. Every page change
+// (automatic boot/error redirects included) must go through gotoPage(), or
+// this drifts out of sync with the real screen and AUX1's toggle/restore
+// logic below acts on stale state.
+uint8_t currentNextionPage = NX_PAGE_BOOT;
+static void gotoPage(uint8_t page) {
+  currentNextionPage = page;
+  Nextion::page(page);
+}
 
 // ---------- Helpers ----------
 static void holdBar(uint32_t elapsed, uint32_t total, char *buf) {
@@ -103,7 +114,10 @@ static void emitTelemetry(const char *phase) {
   if (bamocarErrorWord != 0)
     CAN::bamocarErrorDescription(bamocarErrorWord, errDesc, sizeof(errDesc));
 
-  char line[640];
+  char bmsFaultDesc[24];
+  Bms::faultDescription(bmsActiveFaults, bmsFaultDesc, sizeof(bmsFaultDesc));
+
+  char line[900];
   snprintf(line, sizeof(line),
     "{\"t\":%lu,\"phase\":\"%s\","
     "\"apps1\":%d,\"apps2\":%d,\"apps1Pct\":%.1f,\"apps2Pct\":%.1f,"
@@ -115,7 +129,11 @@ static void emitTelemetry(const char *phase) {
     "\"motorTemp\":%d,\"invTemp\":%.1f,"
     "\"bamOnline\":%d,\"status\":%d,\"err\":%lu,\"errDesc\":\"%s\","
     "\"imuFound\":%d,\"ax\":%.2f,\"ay\":%.2f,\"az\":%.2f,\"decelBrake\":%d,"
-    "\"imuCal\":{\"state\":\"%s\",\"pct\":%d,\"axis\":\"%c\",\"sign\":%d,\"peak\":%.2f}}",
+    "\"imuCal\":{\"state\":\"%s\",\"pct\":%d,\"axis\":\"%c\",\"sign\":%d,\"peak\":%.2f},"
+    "\"bms\":{\"online\":%d,\"state\":\"%s\",\"vbat\":%.2f,\"vpack\":%.2f,\"i\":%.2f,"
+    "\"masterOk\":%d,\"dischargeOk\":%d,\"chargeOk\":%d,\"chargerSafetyOk\":%d,"
+    "\"activeFaults\":%lu,\"latchedFaults\":%lu,\"faultDesc\":\"%s\","
+    "\"cellMinMv\":%d,\"cellMaxMv\":%d,\"tempMinC\":%.1f,\"tempMaxC\":%.1f}}",
     (unsigned long)millis(), phase,
     a1, a2, p1, p2,
     bf, br, brakeLightOn ? 1 : 0,
@@ -132,7 +150,14 @@ static void emitTelemetry(const char *phase) {
     mpuController.decelBrakeActive() ? 1 : 0,
     mpuController.calStateName(), mpuController.calProgressPercent(),
     mpuController.calDetectedAxisName(), mpuController.calDetectedSign(),
-    mpuController.calPeakDelta());
+    mpuController.calPeakDelta(),
+    bmsOnline ? 1 : 0, Bms::stateName(bmsStateRaw),
+    bmsVbatMv / 1000.0f, bmsVpackMv / 1000.0f, bmsIBattMa / 1000.0f,
+    bmsMasterOk ? 1 : 0, bmsDischargeOk ? 1 : 0, bmsChargeOk ? 1 : 0, bmsChargerSafetyOk ? 1 : 0,
+    (unsigned long)bmsActiveFaults, (unsigned long)bmsLatchedFaults, bmsFaultDesc,
+    bmsCellMinMv == 0xFFFF ? 0 : bmsCellMinMv, bmsCellMaxMv,
+    bmsTempMinCx10 == BMS_TEMP_INVALID_CX10 ? 0.0f : bmsTempMinCx10 / 10.0f,
+    bmsTempMaxCx10 == BMS_TEMP_INVALID_CX10 ? 0.0f : bmsTempMaxCx10 / 10.0f);
   Serial.println(line);
 }
 
@@ -194,10 +219,11 @@ static void updateSystemsPanel() {
   // bytes - its own command parser expands that into a real line break. A
   // raw 0x0D byte (what C's '\r' collapses to) is NOT the same thing, so
   // this has to be "\\r" in the source to put backslash-r on the wire.
-  char buf[128];
+  char buf[160];
   snprintf(buf, sizeof(buf),
-    "BAMOCAR: %s\\rIMU: %s\\rPRECHARGE: %s\\rBSPD: %s\\rSD LOG: %s",
+    "BAMOCAR: %s\\rBMS: %s\\rIMU: %s\\rPRECHARGE: %s\\rBSPD: %s\\rSD LOG: %s",
     bamocarOnline ? "ONLINE" : "OFFLINE",
+    bmsOnline ? "ONLINE" : "OFFLINE",
     mpuController.found() ? "OK" : "NOT FOUND",
     prechargeEnabled ? "ON" : "OFF",
     bspdFault ? "FAULT" : "OK",
@@ -282,9 +308,15 @@ void loop() {
     driveReady = false;
     currentTorque = 0;
     vcuState = VcuState::WAIT_BAMOCAR;
-    Nextion::page(NX_PAGE_BOOT);
+    gotoPage(NX_PAGE_BOOT);
     Nextion::bootStatus("BAMOCAR OFFLINE", "reconnecting...");
     Logger::log(LogLevel::ERROR, "Main", "BAMOCAR rx timeout, reconnecting");
+  }
+
+  // --- BMS rx watchdog: receiver only, no state-machine action taken yet ---
+  if (bmsOnline && millis() - lastBmsRx > BMS_STALE_TIMEOUT_MS) {
+    bmsOnline = false;
+    Logger::log(LogLevel::ERROR, "Main", "BMS rx timeout");
   }
 
   // --- BAMOCAR error latch ---
@@ -297,14 +329,18 @@ void loop() {
       currentTorque = 0;
       char detail[32];
       CAN::bamocarErrorDescription(bamocarErrorWord, detail, sizeof(detail));
-      Nextion::page(NX_PAGE_BOOT);
+      gotoPage(NX_PAGE_BOOT);
       Nextion::bootStatus("ERROR", detail);
       Logger::log(LogLevel::ERROR, "Main", detail);
     }
   } else if (inErrorState) {
     inErrorState = false;
+    // t_status/t_detail only ever got written on the ERROR rising edge above
+    // - nothing cleared them back, so they'd show stale "ERROR"/"BUS TIMEOUT"
+    // forever even after bamocarErrorWord actually cleared.
+    Nextion::bootStatus("OK", "no active errors");
     if (vcuState != VcuState::WAIT_BAMOCAR) {
-      Nextion::page(NX_PAGE_DRIVE);
+      gotoPage(NX_PAGE_DRIVE);
       Nextion::sendText(NX_DRIVE_STATE, driveEnabled ? "ON" : "OFF");
     }
   }
@@ -342,7 +378,7 @@ void loop() {
         driveReady = true;
         vcuState = VcuState::STANDBY;
         rtdHoldStart = 0;
-        Nextion::page(NX_PAGE_DRIVE);
+        gotoPage(NX_PAGE_DRIVE);
         Nextion::sendText(NX_DRIVE_STATE, "OFF");
         Logger::log(LogLevel::INFO, "Main", "BAMOCAR online, comms configured");
       }
@@ -418,8 +454,35 @@ void loop() {
     }
   }
 
-  // AUX1 (pin AUX_BUTTON1_PIN, INPUT_PULLUP set in setup()):
-  // reserved for a dashboard function, not yet decided.
+  // --- AUX1: Nextion page nav. Tap toggles page0/page1; held
+  // AUX1_PAGE_HOLD_MS jumps to page3 (content TBD), saving whichever of
+  // page0/page1 was showing; the next tap restores it. Tap only fires on
+  // release-before-hold-fired, so a hold doesn't also toggle at press time. ---
+  static uint32_t aux1HoldStart = 0;
+  static bool aux1HoldFired = false;
+  static uint8_t aux1SavedPage = NX_PAGE_DRIVE;
+  bool aux1Down = digitalRead(AUX_BUTTON1_PIN) == LOW;
+  if (aux1Down) {
+    if (aux1HoldStart == 0) aux1HoldStart = millis();
+    if (!aux1HoldFired && millis() - aux1HoldStart >= AUX1_PAGE_HOLD_MS) {
+      aux1HoldFired = true;
+      if (currentNextionPage != NX_PAGE_3) aux1SavedPage = currentNextionPage;
+      gotoPage(NX_PAGE_3);
+      Logger::log(LogLevel::INFO, "Main", "Nextion -> page3 (AUX1 hold)");
+    }
+  } else {
+    if (aux1HoldStart != 0 && !aux1HoldFired) {
+      if (currentNextionPage == NX_PAGE_3) {
+        gotoPage(aux1SavedPage);
+      } else if (currentNextionPage == NX_PAGE_BOOT) {
+        gotoPage(NX_PAGE_DRIVE);
+      } else {
+        gotoPage(NX_PAGE_BOOT);
+      }
+    }
+    aux1HoldStart = 0;
+    aux1HoldFired = false;
+  }
 
   // --- AUX2: press enables precharge, hold PRECHARGE_DISABLE_HOLD_MS
   // disables it ---

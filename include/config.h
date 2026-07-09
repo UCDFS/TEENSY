@@ -44,6 +44,11 @@ extern FsFile logFile;
 // Output, drives speaker MOSFET gate. HIGH = speaker on.
 #define RTD_SPEAKER_EN_PIN 9
 
+// --------- AUX1 (Nextion page nav) ----------
+// Tap toggles page0/page1. Held AUX1_PAGE_HOLD_MS jumps to page3, saving
+// whichever of page0/page1 was showing; a later tap restores it.
+#define AUX1_PAGE_HOLD_MS 2000
+
 // --------- BRAKE ----------
 // Brake light follows brake pedal pressure directly (no button). Each
 // channel triggers/clears relative to its OWN rest count, not a shared
@@ -66,9 +71,9 @@ extern FsFile logFile;
 #define APPS1_PIN  A0
 #define APPS2_PIN  A1
 // Calibrated 2026-07-08 on the breakout board (through its 10k/20k divider).
-#define APPS1_REST 1727   // calibrate: ADC at physical zero
+#define APPS1_REST 1711   // calibrate: ADC at physical zero
 #define APPS1_FULL 1036   // calibrate: ADC at full pedal
-#define APPS2_REST 1757   // calibrate: ADC at physical zero
+#define APPS2_REST 1735   // calibrate: ADC at physical zero
 #define APPS2_FULL 1060   // calibrate: ADC at full pedal
 #define PEDAL_DEADBAND_PERCENT 3
 #define PEDAL_PLAUSIBILITY_PERCENT 10
@@ -105,3 +110,8 @@ extern FsFile logFile;
 #define BAMOCAR_RX_ID 0x201  // Teensy → Bamocar
 #define BAMOCAR_TX_ID 0x181  // Bamocar → Teensy
 extern FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1;
+
+// ---------- BMS (BMS_Firmware_KR, drive CAN, same Can1 bus/500kbit as BAMOCAR) ----------
+// Must match the BMS's configured can_base_id (bms_config.c default 0x0500).
+#define BMS_CAN_BASE_ID 0x500
+#define BMS_STALE_TIMEOUT_MS 500  // matches BAMOCAR's rx watchdog window

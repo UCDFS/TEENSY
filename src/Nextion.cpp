@@ -13,6 +13,10 @@ void Nextion::begin() {
   delay(100);
   sendCmd(""); // clear RX buffer
   sendCmd("bkcmd=1"); // enable Nextion command feedback
+  // isbr must be on for t_systems' multi-row status text to honour the \r
+  // line breaks in sendText() - forced here so it doesn't depend on the
+  // HMI project having saved that attribute correctly.
+  sendCmd(NX_BOOT_SYSTEMS ".isbr=1");
   sendCmd("page 0");
 }
 
@@ -52,9 +56,10 @@ void Nextion::updateDash(DashStatus dashStatus) {
   sendNumber(NX_DRIVE_RPM, dashStatus.rpm);
   sendNumber(NX_DRIVE_TORQUE, dashStatus.torque);
   sendNumber(NX_DRIVE_DCBUS, dashStatus.dcBusV);
-  //sendText(NX_DRIVE_FAULT, dashStatus.fault ? "FAULT" : "OK");
-  //sendText(NX_DRIVE_STATE, dashStatus.driveOn ? "DRIVE: ON" : "DRIVE: OFF");
-  // TODO: update fault and drive state when we have that data from CAN
+  sendText(NX_DRIVE_FAULT, dashStatus.fault ? "FAULT" : "OK");
+  // t_drive (NX_DRIVE_STATE) is NOT sent here - main.cpp's state machine
+  // already writes richer text there directly (hold progress bar, CLEARED,
+  // HOLD BRAKE, etc). Sending dashStatus.driveOn here too would race it.
   sendNumber(NX_DRIVE_MOTOR_TEMP, dashStatus.motorTemp);
   sendNumber(NX_DRIVE_INVERTER_TEMP, dashStatus.inverterTemp);
   sendNumberValue(NX_DRIVE_SPEED_BAR, dashStatus.torque);

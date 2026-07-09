@@ -174,6 +174,23 @@
       <span class="v" id="v-calResult">—</span></div>
   </div>
 
+  <!-- BMS -->
+  <div class="card">
+    <h2>BMS</h2>
+    <div class="pills" style="margin-bottom:12px">
+      <span class="pill" id="p-bmsOnline">BMS</span>
+      <span class="pill" id="p-bmsMasterOk">MASTER OK</span>
+      <span class="pill" id="p-bmsDischargeOk">DISCHARGE OK</span>
+    </div>
+    <div class="row"><span class="k">State</span><span class="v" id="v-bmsState">—</span></div>
+    <div class="row"><span class="k">Fault</span><span class="v" id="v-bmsFault">OK</span></div>
+    <div class="row"><span class="k">Vbat / Vpack</span>
+      <span class="v" id="v-bmsVbat">0.00 V</span> / <span class="v" id="v-bmsVpack">0.00 V</span></div>
+    <div class="row"><span class="k">Current</span><span class="v" id="v-bmsCurrent">0.00 A</span></div>
+    <div class="row"><span class="k">Cell min / max</span><span class="v" id="v-bmsCell">— / —</span></div>
+    <div class="row"><span class="k">Temp min / max</span><span class="v" id="v-bmsTemp">— / —</span></div>
+  </div>
+
   <!-- Timing -->
   <div class="card">
     <h2>Link</h2>
@@ -362,6 +379,19 @@ function applyTelemetry(d) {
     $('v-calResult').textContent = '—';
   }
   $('calStart').disabled = (cal.state === 'BASELINE' || cal.state === 'WAIT_TILT');
+
+  const bms = d.bms ?? {};
+  pill('p-bmsOnline', !!bms.online);
+  pill('p-bmsMasterOk', !!bms.masterOk);
+  pill('p-bmsDischargeOk', !!bms.dischargeOk);
+  $('v-bmsState').textContent = bms.state ?? '—';
+  $('v-bmsFault').textContent = bms.faultDesc ?? 'OK';
+  $('v-bmsFault').style.color = (bms.activeFaults && bms.activeFaults !== 0) ? 'var(--err)' : 'var(--on)';
+  $('v-bmsVbat').textContent = fmt(bms.vbat) + ' V';
+  $('v-bmsVpack').textContent = fmt(bms.vpack) + ' V';
+  $('v-bmsCurrent').textContent = fmt(bms.i) + ' A';
+  $('v-bmsCell').textContent = (bms.cellMinMv ?? 0) + ' mV / ' + (bms.cellMaxMv ?? 0) + ' mV';
+  $('v-bmsTemp').textContent = fmt(bms.tempMinC) + ' °C / ' + fmt(bms.tempMaxC) + ' °C';
 }
 function fmt(x) { return (x === undefined || x === null) ? '—' : Number(x).toFixed(1); }
 
