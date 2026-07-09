@@ -41,10 +41,11 @@ extern FsFile logFile;
 // Formula handles both rising and falling sensor directions.
 #define APPS1_PIN  A0
 #define APPS2_PIN  A1
-#define APPS1_REST 2884   // calibrate: ADC at physical zero
-#define APPS1_FULL 1835   // calibrate: ADC at full pedal
-#define APPS2_REST 2910   // calibrate: ADC at physical zero
-#define APPS2_FULL 1845   // calibrate: ADC at full pedal
+// Calibrated 2026-07-08 on the breakout board (through its 10k/20k divider).
+#define APPS1_REST 1727   // calibrate: ADC at physical zero
+#define APPS1_FULL 1036   // calibrate: ADC at full pedal
+#define APPS2_REST 1757   // calibrate: ADC at physical zero
+#define APPS2_FULL 1060   // calibrate: ADC at full pedal
 #define PEDAL_DEADBAND_PERCENT 3
 #define PEDAL_PLAUSIBILITY_PERCENT 10
 #define MAX_ACCEL_PERCENT 100
