@@ -86,10 +86,12 @@ extern FsFile logFile;
 #define TORQUE_MAX 32767
 
 // ---------- BSPD (brake-throttle plausibility) ----------
-// FSAE EV rule: brake pressed + APPS > BSPD_APPS_PERCENT simultaneously ->
-// zero torque, latched until APPS < BSPD_RESET_PERCENT regardless of brake.
+// FS 2026 Rules EV2.3.1/EV2.3.2: brake pressed + APPS > BSPD_APPS_PERCENT
+// simultaneously for longer than BSPD_TRIP_MS -> zero torque, latched until
+// APPS < BSPD_RESET_PERCENT regardless of brake state.
 #define BSPD_APPS_PERCENT   25.0f
 #define BSPD_RESET_PERCENT  5.0f
+#define BSPD_TRIP_MS        500
 
 // ---------- Adafruit MPU -----------
 #define MPU_ACCEL_RANGE MPU6050_RANGE_8_G

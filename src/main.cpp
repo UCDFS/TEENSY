@@ -80,12 +80,24 @@ static bool pedalAtRest() {
   return pedal.pct < PEDAL_DEADBAND_PERCENT;
 }
 
-// BSPD: brake pedal pressed (pressure-based brakeLightOn, not the IMU decel
-// trigger) while APPS shows > BSPD_APPS_PERCENT cuts torque and latches until
-// APPS drops below BSPD_RESET_PERCENT, independent of brake state - matches
-// FSAE EV brake-throttle plausibility rules.
+// BSPD per FS 2026 Rules EV2.3.1/EV2.3.2: brake pedal pressed (pressure-based
+// brakeLightOn, not the IMU decel trigger) while APPS shows > BSPD_APPS_PERCENT,
+// sustained for longer than BSPD_TRIP_MS, cuts torque and latches until APPS
+// drops below BSPD_RESET_PERCENT, independent of brake state. The trip-side
+// debounce is the rule text itself ("for longer than 500ms"), not a relaxation
+// of it - a single noisy sample or a foot mid-transition between pedals must
+// not trip it, but genuine sustained overlap still must.
+static uint32_t bspdConditionSince = 0;
+
 static int16_t applyBspd(int16_t torque, float pedalPct) {
-  if (brakeLightOn && pedalPct > BSPD_APPS_PERCENT) bspdFault = true;
+  bool implausible = brakeLightOn && pedalPct > BSPD_APPS_PERCENT;
+  if (implausible) {
+    if (bspdConditionSince == 0) bspdConditionSince = millis();
+    if (millis() - bspdConditionSince > BSPD_TRIP_MS) bspdFault = true;
+  } else {
+    bspdConditionSince = 0;
+  }
+
   if (bspdFault) {
     if (pedalPct < BSPD_RESET_PERCENT) bspdFault = false;
     else return 0;
