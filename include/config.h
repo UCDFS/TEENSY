@@ -14,9 +14,14 @@ extern uint32_t lastBamocarRx;
 #define SERIAL_LOG_LEVEL LogLevel::DEBUG  // threshold for logging to serial (NONE to disable)
 #define LOG_SD false
 #define LOG_SERIAL false
-#define MAX_BUF 16
+// 256 entries (~32KB): a single CAN::readCanMessages() call can drain a whole
+// burst (BMS's 19 cell + 19 temp frames, several BAMOCAR replies) in one
+// loop iteration, all pushed before Logger::process() gets to drain any of
+// it - 16 was nowhere near enough headroom and was silently dropping entries.
+#define MAX_BUF 256
 #define MAX_LOG_LEN 128
-extern FsFile logFile; 
+#define TELEMETRY_SYNC_MS 500  // matches the event log's own sync cadence
+extern FsFile logFile;
 
 // --------- BUTTONS ----------
 // All buttons wire one leg to GND, other to the Teensy pin: use

@@ -2,6 +2,7 @@
 
 SdFs Logger::sd;
 FsFile Logger::logFile;
+FsFile Logger::telemetryFile;
 CircularBuffer<LogEntry, MAX_BUF> Logger::_logBuffer;
 
 const char* Logger::levelToStr(LogLevel level) {
@@ -49,25 +50,49 @@ bool Logger::begin() {
         return false;
     }
 
+    if (!telemetryFile.open("telemetry.csv", O_RDWR | O_CREAT | O_AT_END)) {
+        return false;
+    }
+
     return true;
 }
 
 void Logger::process() {
-    if (_logBuffer.isEmpty()) return;
-
     LogEntry entry;
-    uint8_t count = 0;
-
-    // Pop and write in small bursts
-    while (_logBuffer.pop(entry) && count < 5) {
+    // Drain the whole buffer every call - MAX_BUF is now sized to absorb a
+    // full CAN burst, so there's no reason to cap this and let entries sit
+    // queued across loop iterations (previously capped at 5/call, which is
+    // most of why 16 slots overflowed constantly).
+    while (_logBuffer.pop(entry)) {
         logFile.println(entry.data);
-        count++;
+    }
+
+    uint32_t dropped = _logBuffer.takeDroppedCount();
+    if (dropped > 0) {
+        char msg[MAX_LOG_LEN];
+        snprintf(msg, sizeof(msg), "log buffer overflowed, dropped %lu entries", (unsigned long)dropped);
+        log(LogLevel::WARNING, "Logger", msg);  // queued for next process() call
     }
 
     // Sync every 500ms
     static uint32_t lastSync = 0;
     if (millis() - lastSync > 500) {
-        logFile.sync(); 
+        logFile.sync();
+        lastSync = millis();
+    }
+}
+
+void Logger::writeTelemetryHeader(const char *header) {
+    telemetryFile.println(header);
+    telemetryFile.sync();
+}
+
+void Logger::writeTelemetryRow(const char *csvLine) {
+    telemetryFile.println(csvLine);
+
+    static uint32_t lastSync = 0;
+    if (millis() - lastSync > TELEMETRY_SYNC_MS) {
+        telemetryFile.sync();
         lastSync = millis();
     }
 }

@@ -159,6 +159,43 @@ static void emitTelemetry(const char *phase) {
     bmsTempMinCx10 == BMS_TEMP_INVALID_CX10 ? 0.0f : bmsTempMinCx10 / 10.0f,
     bmsTempMaxCx10 == BMS_TEMP_INVALID_CX10 ? 0.0f : bmsTempMaxCx10 / 10.0f);
   Serial.println(line);
+
+  // Same values, fixed-rate CSV row to SD - this is the channel log that
+  // survives a standalone track session with no laptop watching the JSON
+  // stream above. Column order must match the header written in setup().
+  char csvLine[400];
+  snprintf(csvLine, sizeof(csvLine),
+    "%lu,%s,"
+    "%d,%d,%.1f,%.1f,"
+    "%d,%d,%d,%.2f,%.2f,%.1f,%.1f,"
+    "%d,%d,%d,%d,%d,%d,"
+    "%d,%d,%.1f,%d,%.1f,%d,%.1f,"
+    "%d,%d,%lu,%s,"
+    "%d,%.2f,%.2f,%.2f,%d,"
+    "%d,%s,%.2f,%.2f,%.2f,"
+    "%d,%d,%d,%d,"
+    "%lu,%lu,%s,"
+    "%d,%d,%.1f,%.1f",
+    (unsigned long)millis(), phase,
+    a1, a2, p1, p2,
+    bf, br, brakeLightOn ? 1 : 0, bfBar, brBar, bfPsi, brPsi,
+    digitalRead(BUTTON_PIN) == LOW ? 1 : 0,
+    digitalRead(AUX_BUTTON1_PIN) == LOW ? 1 : 0,
+    digitalRead(AUX_BUTTON2_PIN) == LOW ? 1 : 0,
+    prechargeEnabled ? 1 : 0, driveEnabled ? 1 : 0, driveReady ? 1 : 0,
+    rpmFeedback, currentTorque, pedal.pct, bspdFault ? 1 : 0, dcBusVoltage,
+    (int)motorTemp, inverterTemp,
+    bamocarOnline ? 1 : 0, statusWord, (unsigned long)bamocarErrorWord, errDesc,
+    mpuController.found() ? 1 : 0, mpuController.ax, mpuController.ay, mpuController.az,
+    mpuController.decelBrakeActive() ? 1 : 0,
+    bmsOnline ? 1 : 0, Bms::stateName(bmsStateRaw),
+    bmsVbatMv / 1000.0f, bmsVpackMv / 1000.0f, bmsIBattMa / 1000.0f,
+    bmsMasterOk ? 1 : 0, bmsDischargeOk ? 1 : 0, bmsChargeOk ? 1 : 0, bmsChargerSafetyOk ? 1 : 0,
+    (unsigned long)bmsActiveFaults, (unsigned long)bmsLatchedFaults, bmsFaultDesc,
+    bmsCellMinMv == 0xFFFF ? 0 : bmsCellMinMv, bmsCellMaxMv,
+    bmsTempMinCx10 == BMS_TEMP_INVALID_CX10 ? 0.0f : bmsTempMinCx10 / 10.0f,
+    bmsTempMaxCx10 == BMS_TEMP_INVALID_CX10 ? 0.0f : bmsTempMaxCx10 / 10.0f);
+  Logger::writeTelemetryRow(csvLine);
 }
 
 // brakeLightOn is pedal-pressure-only and feeds the RTD enable interlock -
@@ -264,6 +301,19 @@ void setup() {
   sdOk = Logger::begin();
   if (!sdOk) {
     Nextion::bootStatus("LOGGING", "SD init failed");
+  } else {
+    Logger::writeTelemetryHeader(
+      "t_ms,phase,"
+      "apps1_raw,apps2_raw,apps1_pct,apps2_pct,"
+      "brake_f_raw,brake_r_raw,brake_light,brake_f_bar,brake_r_bar,brake_f_psi,brake_r_psi,"
+      "rtd,aux1,aux2,precharge,drive_en,drive_ready,"
+      "rpm,torque,torque_pct,bspd_fault,dc_bus,motor_temp,inv_temp,"
+      "bam_online,status_word,err_word,err_desc,"
+      "imu_found,ax,ay,az,decel_brake,"
+      "bms_online,bms_state,bms_vbat,bms_vpack,bms_i,"
+      "bms_master_ok,bms_discharge_ok,bms_charge_ok,bms_charger_safety_ok,"
+      "bms_active_faults,bms_latched_faults,bms_fault_desc,"
+      "bms_cell_min_mv,bms_cell_max_mv,bms_temp_min_c,bms_temp_max_c");
   }
 
   Logger::log(LogLevel::INFO, "Main", "System booting up, initialising components");
