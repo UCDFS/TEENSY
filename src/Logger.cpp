@@ -39,20 +39,58 @@ void Logger::logCANFrame(const CAN_message_t &msg, const char *dir) {
   log(LogLevel::INFO, "CAN", line);
 }
 
+uint32_t Logger::nextSessionNumber() {
+    uint32_t session = 1;
+
+    FsFile f;
+    if (f.open("session.cnt", O_RDONLY)) {
+        char buf[16] = {0};
+        int n = f.read(buf, sizeof(buf) - 1);
+        f.close();
+        if (n > 0) {
+            buf[n] = '\0';
+            uint32_t parsed = (uint32_t)atol(buf);
+            if (parsed > 0) session = parsed;
+        }
+    }
+
+    if (f.open("session.cnt", O_RDWR | O_CREAT | O_TRUNC)) {
+        char buf[16];
+        int n = snprintf(buf, sizeof(buf), "%lu", (unsigned long)(session + 1));
+        f.write(buf, n);
+        f.sync();
+        f.close();
+    }
+
+    return session;
+}
+
 bool Logger::begin() {
     // SdioConfig(FIFO_SDIO) tells the Teensy to use the fast onboard slot
     if (!sd.begin(SdioConfig(FIFO_SDIO))) {
         return false;
     }
 
-    // O_RDWR | O_CREAT | O_AT_END are standard POSIX flags
-    if (!logFile.open("log.txt", O_RDWR | O_CREAT | O_AT_END)) {
+    uint32_t session = nextSessionNumber();
+
+    // O_RDWR | O_CREAT | O_AT_END are standard POSIX flags. Each session
+    // gets its own file - O_AT_END is a no-op on a brand new file but
+    // harmless to leave in case a same-numbered file somehow already exists.
+    char logName[24];
+    snprintf(logName, sizeof(logName), "log_%04lu.txt", (unsigned long)session);
+    if (!logFile.open(logName, O_RDWR | O_CREAT | O_AT_END)) {
         return false;
     }
 
-    if (!telemetryFile.open("telemetry.csv", O_RDWR | O_CREAT | O_AT_END)) {
+    char telemName[24];
+    snprintf(telemName, sizeof(telemName), "telem_%04lu.csv", (unsigned long)session);
+    if (!telemetryFile.open(telemName, O_RDWR | O_CREAT | O_AT_END)) {
         return false;
     }
+
+    char msg[32];
+    snprintf(msg, sizeof(msg), "Session %lu started", (unsigned long)session);
+    log(LogLevel::INFO, "Logger", msg);
 
     return true;
 }

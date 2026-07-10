@@ -15,6 +15,14 @@ private:
   static FsFile logFile;
   static FsFile telemetryFile;
 
+  // Persistent boot counter (session.cnt on the SD card) - no RTC on this
+  // board, so session numbers are the only way to tell one power-on's files
+  // apart from the next. Reads the stored value (1 if the file doesn't exist
+  // yet), immediately writes back n+1, and returns n - so even if this
+  // session never shuts down cleanly, the number is already consumed and the
+  // next boot won't collide with it.
+  static uint32_t nextSessionNumber();
+
 public:
   static CircularBuffer<LogEntry, MAX_BUF> _logBuffer;
   static bool begin();
