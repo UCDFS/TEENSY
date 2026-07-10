@@ -154,7 +154,7 @@
     <div class="row"><span class="k">Torque cmd</span><span class="v" id="v-torque">0</span> <span class="muted">(<span id="v-torquePct">0.0</span>%)</span></div>
     <div class="row"><span class="k">DC bus</span><span class="v" id="v-dcBus">0.0 V</span></div>
     <div class="row"><span class="k">Inverter temp</span><span class="v" id="v-invTemp">0.0 °C</span></div>
-    <div class="row"><span class="k">Motor temp</span><span class="v" id="v-motorTemp">— (no cal)</span></div>
+    <div class="row"><span class="k">Motor temp</span><span class="v" id="v-motorTemp">0.0 °C</span></div>
   </div>
 
   <!-- IMU -->
@@ -354,6 +354,7 @@ function applyTelemetry(d) {
   $('v-torquePct').textContent = fmt(d.torquePct);
   $('v-dcBus').textContent = fmt(d.dcBus) + ' V';
   $('v-invTemp').textContent = fmt(d.invTemp) + ' °C';
+  $('v-motorTemp').textContent = fmt(d.motorTemp) + ' °C';
   $('v-t').textContent = (d.t / 1000).toFixed(1) + ' s';
 
   pill('p-imuFound', !!d.imuFound);

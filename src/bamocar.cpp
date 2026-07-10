@@ -147,11 +147,29 @@ void sendTorqueCommand(int16_t torqueValue) {
   sendCAN(msg);
 }
 
-// ---------- IGBT temperature conversion ----------
+// ---------- Temperature conversion (IGBT + motor) ----------
+// Shared linear-interpolation lookup, clamped at the table ends. Both curves
+// below use it - factored out now that there are two nearly-identical tables
+// instead of duplicating the same scan/interpolate logic twice.
+struct TempPoint { float x; float degC; };
+
+static float interpTempTable(const TempPoint *table, size_t len, float x) {
+  if (x <= table[0].x) return table[0].degC;
+  if (x >= table[len - 1].x) return table[len - 1].degC;
+
+  for (size_t i = 1; i < len; i++) {
+    if (x <= table[i].x) {
+      const TempPoint &lo = table[i - 1];
+      const TempPoint &hi = table[i];
+      float frac = (x - lo.x) / (hi.x - lo.x);
+      return lo.degC + frac * (hi.degC - lo.degC);
+    }
+  }
+  return table[len - 1].degC;  // unreachable
+}
+
 // BAMOCAR-PG-D3-700/400 manual p.49, "6.2 Power stages - temperature":
-// 3x NTC in IGBT, register 0x4A. Num vs degC, linearly interpolated between
-// table points and clamped at the ends (table only spans -30 to 125 C).
-struct TempPoint { uint16_t num; float degC; };
+// 3x NTC in IGBT, register 0x4A. Raw ADC count vs degC (table spans -30 to 125 C).
 static const TempPoint IGBT_TEMP_TABLE[] = {
   {16308, -30}, {16387, -25}, {16487, -20}, {16609, -15}, {16757, -10},
   {16938,  -5}, {17151,   0}, {17400,   5}, {17688,  10}, {18017,  15},
@@ -164,19 +182,33 @@ static const TempPoint IGBT_TEMP_TABLE[] = {
 #define IGBT_TEMP_TABLE_LEN (sizeof(IGBT_TEMP_TABLE) / sizeof(IGBT_TEMP_TABLE[0]))
 
 float igbtADCToTemp(uint16_t raw) {
-  if (raw <= IGBT_TEMP_TABLE[0].num) return IGBT_TEMP_TABLE[0].degC;
-  if (raw >= IGBT_TEMP_TABLE[IGBT_TEMP_TABLE_LEN - 1].num)
-    return IGBT_TEMP_TABLE[IGBT_TEMP_TABLE_LEN - 1].degC;
+  return interpTempTable(IGBT_TEMP_TABLE, IGBT_TEMP_TABLE_LEN, (float)raw);
+}
 
-  for (size_t i = 1; i < IGBT_TEMP_TABLE_LEN; i++) {
-    if (raw <= IGBT_TEMP_TABLE[i].num) {
-      const TempPoint &lo = IGBT_TEMP_TABLE[i - 1];
-      const TempPoint &hi = IGBT_TEMP_TABLE[i];
-      float frac = (float)(raw - lo.num) / (float)(hi.num - lo.num);
-      return lo.degC + frac * (hi.degC - lo.degC);
-    }
-  }
-  return IGBT_TEMP_TABLE[IGBT_TEMP_TABLE_LEN - 1].degC;  // unreachable
+// KTY81-210 resistance -> temperature (EMRAX 208's motor temp sensor, per
+// EMRAX datasheet). R25=2000 ohm matches the sensor's datasheet-defining
+// spec exactly, corroborating this curve.
+static const TempPoint KTY_TEMP_TABLE[] = {
+  { 980, -55}, {1030, -50}, {1135, -40}, {1247, -30}, {1367, -20},
+  {1495, -10}, {1630,   0}, {1772,  10}, {1922,  20}, {2000,  25},
+  {2080,  30}, {2245,  40}, {2417,  50}, {2597,  60}, {2785,  70},
+  {2980,  80}, {3182,  90}, {3392, 100}, {3607, 110}, {3817, 120},
+  {3915, 125}, {4008, 130}, {4166, 140}, {4280, 150},
+};
+#define KTY_TEMP_TABLE_LEN (sizeof(KTY_TEMP_TABLE) / sizeof(KTY_TEMP_TABLE[0]))
+
+// BAMOCAR-PG-D3-700/400 manual, X2 connector schematic (resolver + motor
+// temp): VCC+5V -> 4k7 pull-up -> TEMP node (100nF filter) -> pin H -> KTY
+// sensor -> pin L -> GND. Series-R (4700 ohm) is confirmed straight off that
+// schematic. ADC full-scale (32768) is NOT confirmed anywhere in the docs -
+// assumed consistent with BAMOCAR's other signed 16-bit normalised registers
+// (speed/current both use +-32767 full scale). If motor temp reads
+// implausibly, this full-scale assumption is the first thing to re-check.
+float motorADCToTemp(uint16_t raw) {
+  const float kSeriesOhm = 4700.0f;
+  const float kADCMax = 32768.0f;
+  float resistance = kSeriesOhm * (float)raw / (kADCMax - (float)raw);
+  return interpTempTable(KTY_TEMP_TABLE, KTY_TEMP_TABLE_LEN, resistance);
 }
 
 // ---------- Error word lookup (RegID 0x8F, BAMOCAR-PG-D3 Manual) ----------
@@ -235,12 +267,9 @@ void readCanMessages() {
         actualCurrent = (int16_t)(msg.buf[1] | (msg.buf[2] << 8));
       }
 
-      else if (reg == 0x49) { // motor temperature (°C)
-        // TODO: no conversion table yet - the BAMOCAR docs only cover the
-        // IGBT NTC curve (see igbtADCToTemp above), not the motor's own
-        // sensor (EMRAX, likely KTY84). Not converting raw -> motorTemp
-        // until that curve is confirmed, rather than reporting a wrong
-        // number that could mask a real motor overtemp.
+      else if (reg == 0x49) { // motor temperature (KTY81-210, see motorADCToTemp above)
+        uint16_t raw = msg.buf[1] | (msg.buf[2] << 8);
+        motorTemp = motorADCToTemp(raw);
       }
 
       else if (reg == 0x4A) { // inverter (IGBT) temperature (°C)
