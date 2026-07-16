@@ -4,6 +4,7 @@ SdFs Logger::sd;
 FsFile Logger::logFile;
 FsFile Logger::telemetryFile;
 CircularBuffer<LogEntry, MAX_BUF> Logger::_logBuffer;
+const char* Logger::_driverName = nullptr;
 
 const char* Logger::levelToStr(LogLevel level) {
     switch (level) {
@@ -14,9 +15,17 @@ const char* Logger::levelToStr(LogLevel level) {
     }
 }
 
+void Logger::setDriver(const char* name) {
+    _driverName = name;
+}
+
 void Logger::log(LogLevel level, const char* module, const char* msg) {
     LogEntry entry;
-    snprintf(entry.data, MAX_LOG_LEN, "[%s] %s: %s", levelToStr(level), module, msg);
+    if (_driverName != nullptr) {
+        snprintf(entry.data, MAX_LOG_LEN, "[%s] [%s] %s: %s", levelToStr(level), _driverName, module, msg);
+    } else {
+        snprintf(entry.data, MAX_LOG_LEN, "[%s] %s: %s", levelToStr(level), module, msg);
+    }
     
     if (SERIAL_LOG_LEVEL >= level) {
         Serial.println(entry.data);

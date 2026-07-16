@@ -34,6 +34,8 @@ Adafruit_MPU6050 MPU;
 MpuController mpuController(MPU);
 Button driveButton(BUTTON_PIN);  // ctor sets INPUT_PULLUP on the RTD pin
 Button aux2Button(AUX_BUTTON2_PIN);
+Profile driverProfile = {"Test", NX_PAGE_DRIVE, 100};
+bool driverSelected = false;
 BrakePedal brakePedal;
 Pedal pedal;
 bool bspdFault = false;
@@ -62,6 +64,11 @@ bool sdOk = false;  // Logger::begin() result at boot - no ongoing SD health che
 // logic below acts on stale state.
 uint8_t currentNextionPage = NX_PAGE_BOOT;
 static void gotoPage(uint8_t page) {
+  if (page == NX_PAGE_DRIVE && !driverSelected) {
+    currentNextionPage = NX_PAGE_PROFILES;
+    Nextion::page(NX_PAGE_PROFILES);
+    return;
+  }
   currentNextionPage = page;
   Nextion::page(page);
 }
@@ -296,6 +303,24 @@ void enableDriveMode() {
   CAN::requestStatusOnce();
   driveEnabled = true;
   chimeSpeaker();
+}
+
+void setProfile(uint8_t driverNumber) {
+  Profile profile;
+  switch (driverNumber) {
+    case 0:  profile = {"Rebecca", NX_PAGE_DRIVE, 100}; break;
+    case 1:  profile = {"Eoghan",  NX_PAGE_DRIVE, 100}; break;
+    case 2:  profile = {"Rian",    NX_PAGE_DRIVE, 100}; break;
+    case 3:  profile = {"Adam",    NX_PAGE_DRIVE, 100}; break;
+    case 4:  profile = {"Shane",   NX_PAGE_DRIVE, 100}; break;
+    default: profile = {"Test",    NX_PAGE_DRIVE, 100}; break;
+  }
+
+  Logger::setDriver(profile.name);
+  driverProfile = profile;
+  driverSelected = true;
+  Nextion::sendText(profile.name)
+  gotoPage(NX_PAGE_DRIVE);
 }
 
 int16_t rpmToKph(int16_t rpm) {
@@ -540,8 +565,9 @@ void loop() {
     if (aux1HoldStart != 0 && !aux1HoldFired) {
       if (currentNextionPage == NX_PAGE_3) {
         gotoPage(aux1SavedPage);
-      } else if (currentNextionPage == NX_PAGE_BOOT) {
-        gotoPage(NX_PAGE_DRIVE);
+      } else if (currentNextionPage == NX_PAGE_BOOT || currentNextionPage == NX_PAGE_PROFILES) {
+        // Don't navigate away from boot or profile selection - these pages
+        // must complete their own flow before drive page is accessible.
       } else {
         gotoPage(NX_PAGE_BOOT);
       }
@@ -577,6 +603,19 @@ void loop() {
   if (bamocarOnline && millis() - lastTorqueSend >= 20) {
     CAN::sendTorqueCommand(driveEnabled ? currentTorque : 0);
     lastTorqueSend = millis();
+  }
+
+  // Parse Nextion touch event packets (7 bytes: 0x65, page, compId, event, 0xFF,0xFF,0xFF).
+  // Only act when on the profiles page. The component ID is used directly as
+  // the driver number - assign component IDs 0-4 to each driver button in the HMI.
+  if (currentNextionPage == NX_PAGE_PROFILES && Serial1.available() >= 7) {
+    uint8_t pkt[7];
+    Serial1.readBytes(pkt, 7);
+    if (pkt[0] == 0x65 && pkt[1] == NX_PAGE_PROFILES &&
+        pkt[3] == 0x01 &&  // 0x01 = press event
+        pkt[4] == 0xFF && pkt[5] == 0xFF && pkt[6] == 0xFF) {
+      setProfile(pkt[2]);  // pkt[2] = component ID -> driver number
+    }
   }
 
   // --- Dash + telemetry ---

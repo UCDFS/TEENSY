@@ -14,6 +14,7 @@ private:
   static SdFs sd;
   static FsFile logFile;
   static FsFile telemetryFile;
+  static const char* _driverName;
 
   // Persistent boot counter (session.cnt on the SD card) - no RTC on this
   // board, so session numbers are the only way to tell one power-on's files
@@ -27,6 +28,7 @@ public:
   static CircularBuffer<LogEntry, MAX_BUF> _logBuffer;
   static bool begin();
   static void sync();
+  static void setDriver(const char* name);
   static void log(LogLevel level, const char* module, const char* msg);
   static void logCANFrame(const CAN_message_t &msg, const char *dir);
   static void process();

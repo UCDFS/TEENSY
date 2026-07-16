@@ -7,9 +7,10 @@
 #define NEXTION_BAUD   115200
 
 // ---- Page IDs ----
-#define NX_PAGE_BOOT   0
-#define NX_PAGE_DRIVE  1
-#define NX_PAGE_3      3   // AUX1 hold target - content not yet designed
+#define NX_PAGE_BOOT     0
+#define NX_PAGE_DRIVE    1
+#define NX_PAGE_PROFILES 2
+#define NX_PAGE_3        3   // AUX1 hold target - content not yet designed
 
 // ---- Boot page component names (from Nextion Editor) ----
 #define NX_BOOT_STATUS "t_status"   // text: current phase
@@ -26,6 +27,7 @@
 #define NX_DRIVE_MOTOR_TEMP  "n_motor_temp"   // number: motor temperature, °C
 #define NX_DRIVE_INVERTER_TEMP  "n_inv_temp"   // number: inverter temperature, °C
 #define NX_DRIVE_SPEED_BAR "j_throttle"    // progress bar: throttle command, 0-100% 
+#define NX_DRIVE_NAME "t_driver"
 
 struct DashStatus {
   int16_t speed; // km/h
@@ -37,6 +39,12 @@ struct DashStatus {
   int16_t motorTemp;  
   int16_t inverterTemp;
 };
+
+typedef struct {
+  const char* name;
+  uint8_t page;
+  uint8_t maxTorque = 100;
+} Profile;
 
 class Nextion {
 private:
