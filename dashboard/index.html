@@ -111,6 +111,15 @@
     <div class="row" style="margin-top:8px"><span class="k">APPS2</span><span class="v"><span id="v-apps2Pct">0.0</span>% <span class="muted" id="v-apps2">(0)</span></span></div>
     <div class="bar"><div id="bar-apps2"></div></div>
     <div class="row" style="margin-top:8px"><span class="k">Plausibility Δ</span><span class="v" id="v-appsDiff">0.0%</span></div>
+    <div class="row" style="margin-top:12px"><span class="k">Calibration</span>
+      <span>
+        <button id="calAppsRest" style="padding:4px 10px">Capture REST</button>
+        <button id="calAppsFull" style="padding:4px 10px">Capture FULL</button>
+      </span></div>
+    <div class="row" style="margin-top:4px"><span class="k" id="v-appsCalStatus">Release pedal fully, click Capture REST</span></div>
+    <div class="bar"><div id="bar-appsCal"></div></div>
+    <div class="row" style="margin-top:8px"><span class="k">Result</span>
+      <span class="v" id="v-appsCalResult" style="font-size:12px">—</span></div>
   </div>
 
   <!-- Brake -->
@@ -273,6 +282,8 @@ async function sendCommand(cmd) {
   finally { writer.releaseLock(); }
 }
 $('calStart').onclick = () => sendCommand('CAL_IMU_START');
+$('calAppsRest').onclick = () => sendCommand('CAL_APPS_REST');
+$('calAppsFull').onclick = () => sendCommand('CAL_APPS_FULL');
 
 async function readLoop() {
   const decoder = new TextDecoderStream();
@@ -336,6 +347,28 @@ function applyTelemetry(d) {
   const diffEl = $('v-appsDiff');
   diffEl.textContent = fmt(diff) + '%';
   diffEl.style.color = diff > 10 ? 'var(--err)' : 'var(--text)';
+
+  const appsCal = d.appsCal ?? {};
+  const appsCalStatusText = {
+    IDLE: (appsCal.restDone && appsCal.fullDone) ? 'Both captured - see result below'
+      : appsCal.restDone ? 'REST captured - now press pedal fully, click Capture FULL'
+      : appsCal.fullDone ? 'FULL captured - now release pedal, click Capture REST'
+      : 'Release pedal fully, click Capture REST',
+    REST: 'Capturing REST - hold pedal fully released...',
+    FULL: 'Capturing FULL - hold pedal fully pressed...'
+  }[appsCal.phase] ?? 'Idle';
+  $('v-appsCalStatus').textContent = appsCalStatusText;
+  bar('bar-appsCal', appsCal.pct ?? 0);
+  if (appsCal.restDone && appsCal.fullDone) {
+    $('v-appsCalResult').textContent =
+      `#define APPS1_REST ${appsCal.rest1}   #define APPS1_FULL ${appsCal.full1}   ` +
+      `#define APPS2_REST ${appsCal.rest2}   #define APPS2_FULL ${appsCal.full2}`;
+  } else {
+    $('v-appsCalResult').textContent = '—';
+  }
+  const appsCalBusy = appsCal.phase === 'REST' || appsCal.phase === 'FULL';
+  $('calAppsRest').disabled = appsCalBusy;
+  $('calAppsFull').disabled = appsCalBusy;
 
   pill('p-brake', !!d.brake, 'onWarn');
   $('v-brakeFBar').textContent = fmt(d.brakeFBar); $('v-brakeFPsi').textContent = fmt(d.brakeFPsi);

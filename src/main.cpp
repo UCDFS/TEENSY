@@ -136,7 +136,7 @@ static void emitTelemetry(const char *phase) {
   char bmsFaultDesc[24];
   Bms::faultDescription(bmsActiveFaults, bmsFaultDesc, sizeof(bmsFaultDesc));
 
-  char line[900];
+  char line[1100];
   snprintf(line, sizeof(line),
     "{\"t\":%lu,\"phase\":\"%s\","
     "\"apps1\":%d,\"apps2\":%d,\"apps1Pct\":%.1f,\"apps2Pct\":%.1f,"
@@ -149,6 +149,8 @@ static void emitTelemetry(const char *phase) {
     "\"bamOnline\":%d,\"status\":%d,\"err\":%lu,\"errDesc\":\"%s\","
     "\"imuFound\":%d,\"ax\":%.2f,\"ay\":%.2f,\"az\":%.2f,\"decelBrake\":%d,"
     "\"imuCal\":{\"state\":\"%s\",\"pct\":%d,\"axis\":\"%c\",\"sign\":%d,\"peak\":%.2f},"
+    "\"appsCal\":{\"phase\":\"%s\",\"pct\":%d,\"restDone\":%d,\"fullDone\":%d,"
+    "\"rest1\":%d,\"rest2\":%d,\"full1\":%d,\"full2\":%d},"
     "\"bms\":{\"online\":%d,\"state\":\"%s\",\"vbat\":%.2f,\"vpack\":%.2f,\"i\":%.2f,"
     "\"masterOk\":%d,\"dischargeOk\":%d,\"chargeOk\":%d,\"chargerSafetyOk\":%d,"
     "\"activeFaults\":%lu,\"latchedFaults\":%lu,\"faultDesc\":\"%s\","
@@ -170,6 +172,9 @@ static void emitTelemetry(const char *phase) {
     mpuController.calStateName(), mpuController.calProgressPercent(),
     mpuController.calDetectedAxisName(), mpuController.calDetectedSign(),
     mpuController.calPeakDelta(),
+    pedal.calPhaseName(), pedal.calProgressPercent(),
+    pedal.calRestDone ? 1 : 0, pedal.calFullDone ? 1 : 0,
+    pedal.calRest1, pedal.calRest2, pedal.calFull1, pedal.calFull2,
     bmsOnline ? 1 : 0, Bms::stateName(bmsStateRaw),
     bmsVbatMv / 1000.0f, bmsVpackMv / 1000.0f, bmsIBattMa / 1000.0f,
     bmsMasterOk ? 1 : 0, bmsDischargeOk ? 1 : 0, bmsChargeOk ? 1 : 0, bmsChargerSafetyOk ? 1 : 0,
@@ -234,6 +239,10 @@ static void updateBrakeLight() {
 static void handleSerialCommand(const char *cmd) {
   if (strcmp(cmd, "CAL_IMU_START") == 0) {
     mpuController.startCalibration();
+  } else if (strcmp(cmd, "CAL_APPS_REST") == 0) {
+    pedal.startCalRest();
+  } else if (strcmp(cmd, "CAL_APPS_FULL") == 0) {
+    pedal.startCalFull();
   }
 }
 

@@ -76,14 +76,16 @@ extern FsFile logFile;
 #define APPS1_PIN  A0
 #define APPS2_PIN  A1
 // Calibrated 2026-07-08 on the breakout board (through its 10k/20k divider).
-#define APPS1_REST 1711   // calibrate: ADC at physical zero
+#define APPS1_REST 1727   // calibrate: ADC at physical zero
 #define APPS1_FULL 1036   // calibrate: ADC at full pedal
-#define APPS2_REST 1735   // calibrate: ADC at physical zero
+#define APPS2_REST 1757   // calibrate: ADC at physical zero
 #define APPS2_FULL 1060   // calibrate: ADC at full pedal
+
 #define PEDAL_DEADBAND_PERCENT 3
 #define PEDAL_PLAUSIBILITY_PERCENT 10
 #define MAX_ACCEL_PERCENT 100
 #define TORQUE_MAX 32767
+#define APPS_CAL_SAMPLE_MS 1000  // dashboard cal wizard: averaging window per rest/full capture
 
 // ---------- BSPD (brake-throttle plausibility) ----------
 // FS 2026 Rules EV2.3.1/EV2.3.2: brake pressed + APPS > BSPD_APPS_PERCENT

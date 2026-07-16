@@ -10,6 +10,8 @@ int16_t Pedal::read() {
   apps1Raw = analogRead(APPS1_PIN);
   apps2Raw = analogRead(APPS2_PIN);
 
+  updateCal();  // always runs, independent of fault/deadband paths below
+
   float pct1 = appsPercent(apps1Raw, APPS1_REST, APPS1_FULL);
   float pct2 = appsPercent(apps2Raw, APPS2_REST, APPS2_FULL);
   pct = (pct1 + pct2) * 0.5f;  // updated even on a fault/deadband return - BSPD needs this live
@@ -45,4 +47,56 @@ int16_t Pedal::read() {
   scaled = std::min(scaled, (float)MAX_ACCEL_PERCENT);
 
   return (int16_t)(TORQUE_MAX * (scaled / 100.0f));
+}
+
+void Pedal::startCalRest() {
+  calPhase = CalPhase::REST;
+  calStart = millis();
+  calSum1 = calSum2 = 0;
+  calSamples = 0;
+}
+
+void Pedal::startCalFull() {
+  calPhase = CalPhase::FULL;
+  calStart = millis();
+  calSum1 = calSum2 = 0;
+  calSamples = 0;
+}
+
+void Pedal::updateCal() {
+  if (calPhase == CalPhase::NONE) return;
+
+  calSum1 += apps1Raw;
+  calSum2 += apps2Raw;
+  calSamples++;
+
+  if (millis() - calStart >= APPS_CAL_SAMPLE_MS) {
+    int16_t avg1 = (int16_t)(calSum1 / calSamples);
+    int16_t avg2 = (int16_t)(calSum2 / calSamples);
+    if (calPhase == CalPhase::REST) {
+      calRest1 = avg1;
+      calRest2 = avg2;
+      calRestDone = true;
+    } else {
+      calFull1 = avg1;
+      calFull2 = avg2;
+      calFullDone = true;
+    }
+    calPhase = CalPhase::NONE;
+  }
+}
+
+const char *Pedal::calPhaseName() const {
+  switch (calPhase) {
+    case CalPhase::REST: return "REST";
+    case CalPhase::FULL: return "FULL";
+    default:             return "IDLE";
+  }
+}
+
+int Pedal::calProgressPercent() const {
+  if (calPhase == CalPhase::NONE) return 0;
+  uint32_t elapsed = millis() - calStart;
+  int pctDone = (int)(elapsed * 100 / APPS_CAL_SAMPLE_MS);
+  return pctDone > 100 ? 100 : pctDone;
 }
