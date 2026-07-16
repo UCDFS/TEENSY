@@ -23,8 +23,8 @@
 #define NX_DRIVE_DCBUS  "n_dc_bus"   // number: DC bus voltage, whole volts
 #define NX_DRIVE_FAULT  "t_fault"   // text: "OK" or "FAULT"
 #define NX_DRIVE_STATE  "t_drive"   // text: "DRIVE: ON" or "DRIVE: OFF"
-#define NX_DRIVE_MOTOR_TEMP  "n_mtemp"   // number: motor temperature, °C
-#define NX_DRIVE_INVERTER_TEMP  "n_itemp"   // number: inverter temperature, °C
+#define NX_DRIVE_MOTOR_TEMP  "n_motor_temp"   // number: motor temperature, °C
+#define NX_DRIVE_INVERTER_TEMP  "n_inv_temp"   // number: inverter temperature, °C
 #define NX_DRIVE_SPEED_BAR "j_throttle"    // progress bar: throttle command, 0-100% 
 
 struct DashStatus {
