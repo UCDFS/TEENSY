@@ -88,7 +88,7 @@ static bool pedalAtRest() {
 // of it - a single noisy sample or a foot mid-transition between pedals must
 // not trip it, but genuine sustained overlap still must.
 static uint32_t bspdConditionSince = 0;
-
+// TODO: ADD >5kW CHECK PER EV2.3.1 - TAKE FROM BAMOCAR CAN
 static int16_t applyBspd(int16_t torque, float pedalPct) {
   bool implausible = brakeLightOn && pedalPct > BSPD_APPS_PERCENT;
   if (implausible) {
