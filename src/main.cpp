@@ -298,6 +298,10 @@ void enableDriveMode() {
   chimeSpeaker();
 }
 
+int16_t rpmToKph(int16_t rpm) {
+  return (int16_t)(rpm * 0.01775);
+}
+
 // ---------- Setup ----------
 // Hardware init only - no blocking gates. The BAMOCAR handshake happens
 // automatically in loop() (same ignition switch powers both, so the
@@ -576,7 +580,7 @@ void loop() {
   }
 
   // --- Dash + telemetry ---
-  dashStatus.speed = 0;
+  dashStatus.speed = rpmToKph(rpmFeedback);
   dashStatus.rpm = rpmFeedback;
   dashStatus.torque = currentTorque;
   dashStatus.dcBusV = (int16_t)dcBusVoltage;
